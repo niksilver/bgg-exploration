@@ -4,8 +4,8 @@ from pathlib import Path
 
 def open_db(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
-    conn.execute("PRAGMA foreign_keys = ON")
     _create_tables(conn)
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -14,7 +14,8 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS ratings (
             user_id  TEXT    NOT NULL,
             bgg_id   INTEGER NOT NULL,
-            rating   REAL    NOT NULL
+            rating   REAL    NOT NULL,
+            PRIMARY KEY (user_id, bgg_id)
         );
 
         CREATE TABLE IF NOT EXISTS game_stats (
