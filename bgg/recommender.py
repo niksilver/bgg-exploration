@@ -5,8 +5,9 @@ def get_recommendations(
     liked_bgg_ids: list[int],
     conn:          sqlite3.Connection,
     min_rating:    float = 8.0,
-    min_fan_count: int   = 5,
+    min_fan_count: int   = 100,
     top_n:         int   = 10,
+    min_avg:       float = 0.0,
 ) -> list[tuple[int, float]]:
     """
     Return (bgg_id, lift) pairs sorted by lift descending.
@@ -63,6 +64,7 @@ def get_recommendations(
         JOIN  game_stats gs  ON fh.bgg_id = gs.bgg_id
         CROSS JOIN n_fans nf
         WHERE gs.high_rating_count > 0
+          AND (? = 0.0 OR gs.rating_avg >= ?)
         ORDER BY lift DESC
         LIMIT ?
     """, (
@@ -70,6 +72,7 @@ def get_recommendations(
         min_rating, *liked_bgg_ids,          # fan_high CTE
         min_fan_count,                       # HAVING
         total_users, total_users,            # base_rate + lift
+        min_avg, min_avg,                    # min_avg filter
         top_n,
     )).fetchall()
 

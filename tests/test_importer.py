@@ -84,6 +84,24 @@ def test_import_ratings_prints_progress_every_second(tmp_path, capsys):
     assert re.match(r"\[\d{2}:\d{2}:\d{2}\] \d[\d,]* records processed", lines[0])
 
 
+def test_build_stats_computes_rating_avg(tmp_path):
+    csv_path = tmp_path / "ratings.csv"
+    _write_csv(csv_path, [
+        {"user": "alice", "ID": "1", "name": "Wingspan", "rating": "9"},
+        {"user": "bob",   "ID": "1", "name": "Wingspan", "rating": "7"},
+        {"user": "carol", "ID": "2", "name": "Agricola", "rating": "8"},
+    ])
+    conn = open_db(tmp_path / "test.db")
+    import_ratings(csv_path, conn)
+
+    build_stats(conn, min_rating=8.0)
+
+    row = conn.execute(
+        "SELECT rating_avg FROM game_stats WHERE bgg_id=1"
+    ).fetchone()
+    assert row[0] == pytest.approx(8.0)  # (9+7)/2 = 8.0
+
+
 def test_import_ratings_raises_on_missing_columns(tmp_path):
     csv_path = tmp_path / "wrong.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:

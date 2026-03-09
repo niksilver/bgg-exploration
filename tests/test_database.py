@@ -44,6 +44,33 @@ def test_ensure_game_cached_inserts_on_first_call(tmp_path):
     client.fetch.assert_called_once_with(266192)
 
 
+def test_open_db_migrates_existing_db_to_add_rating_avg(tmp_path):
+    # Simulate a pre-migration DB: create game_stats without rating_avg
+    db_path = tmp_path / "old.db"
+    conn = sqlite3.connect(db_path)
+    conn.executescript("""
+        CREATE TABLE game_stats (
+            bgg_id            INTEGER PRIMARY KEY,
+            high_rating_count INTEGER NOT NULL,
+            total_raters      INTEGER NOT NULL
+        );
+    """)
+    conn.close()
+
+    conn = open_db(db_path)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(game_stats)")}
+    conn.close()
+
+    assert "rating_avg" in columns
+
+
+def test_game_stats_has_rating_avg_column(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(game_stats)")}
+    assert "rating_avg" in columns
+    conn.close()
+
+
 def test_ensure_game_cached_skips_api_if_already_present(tmp_path):
     conn = open_db(tmp_path / "test.db")
     conn.execute(

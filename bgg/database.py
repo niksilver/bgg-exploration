@@ -5,6 +5,7 @@ from pathlib import Path
 def open_db(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path)
     _create_tables(conn)
+    _migrate(conn)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
@@ -21,7 +22,8 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         CREATE TABLE IF NOT EXISTS game_stats (
             bgg_id            INTEGER PRIMARY KEY,
             high_rating_count INTEGER NOT NULL,
-            total_raters      INTEGER NOT NULL
+            total_raters      INTEGER NOT NULL,
+            rating_avg        REAL
         );
 
         CREATE TABLE IF NOT EXISTS games (
@@ -38,6 +40,13 @@ def _create_tables(conn: sqlite3.Connection) -> None:
         );
     """)
     conn.commit()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(game_stats)")}
+    if "rating_avg" not in cols:
+        conn.execute("ALTER TABLE game_stats ADD COLUMN rating_avg REAL")
+        conn.commit()
 
 
 def create_indexes(conn: sqlite3.Connection) -> None:

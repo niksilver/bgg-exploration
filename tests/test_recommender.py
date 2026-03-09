@@ -11,10 +11,11 @@ def _seed(conn, ratings):
     conn.commit()
     # Build stats with threshold 8.0
     conn.execute("""
-        INSERT OR REPLACE INTO game_stats (bgg_id, high_rating_count, total_raters)
+        INSERT OR REPLACE INTO game_stats (bgg_id, high_rating_count, total_raters, rating_avg)
         SELECT bgg_id,
                COUNT(CASE WHEN rating >= 8.0 THEN 1 END),
-               COUNT(*)
+               COUNT(*),
+               AVG(rating)
         FROM ratings GROUP BY bgg_id
     """)
     total = conn.execute(
@@ -64,6 +65,42 @@ def test_liked_games_excluded_from_results(tmp_path):
 def test_returns_empty_for_empty_input(tmp_path):
     conn = open_db(tmp_path / "test.db")
     assert get_recommendations([], conn) == []
+
+
+def test_min_avg_filters_low_rated_games(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    # u0-u4 are fans of game 1; they also rate game 2 (avg=9.0) and game 3 (fans give 9 but
+    # many non-fans give 1.0, dragging avg to ~3.67 which is below min_avg=7.0).
+    ratings = (
+        [(f"u{i}",    1, 9.0) for i in range(5)] +
+        [(f"u{i}",    2, 9.0) for i in range(5)] +
+        [(f"u{i}",    3, 9.0) for i in range(5)] +
+        [(f"u{i+10}", 3, 1.0) for i in range(10)]
+    )
+    _seed(conn, ratings)
+
+    results = get_recommendations([1], conn, min_rating=8.0, min_fan_count=1, min_avg=7.0)
+
+    bgg_ids = [r[0] for r in results]
+    assert 2 in bgg_ids      # avg 9.0 >= 7.0 → included
+    assert 3 not in bgg_ids  # avg ≈ 3.67 < 7.0 → filtered out
+
+
+def test_min_avg_zero_means_no_filter(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    ratings = (
+        [(f"u{i}",    1, 9.0) for i in range(5)] +
+        [(f"u{i}",    2, 9.0) for i in range(5)] +
+        [(f"u{i}",    3, 9.0) for i in range(5)] +
+        [(f"u{i+10}", 3, 1.0) for i in range(10)]
+    )
+    _seed(conn, ratings)
+
+    results = get_recommendations([1], conn, min_rating=8.0, min_fan_count=1, min_avg=0.0)
+
+    bgg_ids = [r[0] for r in results]
+    assert 2 in bgg_ids
+    assert 3 in bgg_ids  # not filtered when min_avg=0.0
 
 
 def test_min_fan_count_filters_obscure_games(tmp_path):

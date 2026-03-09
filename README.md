@@ -22,4 +22,31 @@ python recommend.py --help
 }
 ```
 
+## Inspecting the database
+
+```bash
+sqlite3 data/bgg.db
+```
+
+Useful commands inside the shell:
+
+```sql
+.tables                          -- list all tables
+.schema game_stats               -- show table definition
+.mode column                     -- aligned output
+.headers on                      -- show column names
+
+SELECT COUNT(*) FROM ratings;
+SELECT COUNT(*) FROM game_stats;
+SELECT value FROM metadata WHERE key = 'total_users';
+
+SELECT * FROM game_stats ORDER BY high_rating_count DESC LIMIT 10;
+```
+
+Or as a one-liner:
+
+```bash
+sqlite3 data/bgg.db "SELECT COUNT(*) FROM ratings;"
+```
+
 [Powered by BGG](https://drive.google.com/file/d/1unpb690BONNJB5HXtJEHfO4Raz7I-5JO/view?usp=drive_link)

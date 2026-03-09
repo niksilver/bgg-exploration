@@ -64,11 +64,12 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
 def build_stats(conn: sqlite3.Connection, min_rating: float = 8.0) -> None:
     """Compute game_stats and total_users metadata. Call once after import."""
     conn.execute("""
-        INSERT OR REPLACE INTO game_stats (bgg_id, high_rating_count, total_raters)
+        INSERT OR REPLACE INTO game_stats (bgg_id, high_rating_count, total_raters, rating_avg)
         SELECT
             bgg_id,
             COUNT(CASE WHEN rating >= ? THEN 1 END),
-            COUNT(*)
+            COUNT(*),
+            AVG(rating)
         FROM ratings
         GROUP BY bgg_id
     """, (min_rating,))
