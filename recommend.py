@@ -12,12 +12,23 @@ import sqlite3
 import sys
 from pathlib import Path
 
-from bgg.api import BGGClient
+from bgg.api import BGGClient, GameSearchResult
 from bgg.database import ensure_game_cached, open_db
 from bgg.recommender import get_recommendations
 
 DB_PATH    = Path("data/bgg.db")
 DEFAULT_N  = 10
+
+
+def _search_local(raw_name: str, conn: sqlite3.Connection) -> list[GameSearchResult]:
+    """Search the local games table for games whose name contains raw_name."""
+    rows = conn.execute(
+        "SELECT bgg_id, name, year_published FROM games "
+        "WHERE INSTR(LOWER(name), LOWER(?)) > 0 "
+        "ORDER BY LENGTH(name) LIMIT 20",
+        (raw_name,),
+    ).fetchall()
+    return [GameSearchResult(bgg_id=r[0], name=r[1], year=r[2]) for r in rows]
 
 
 def _parse_game_input(raw: str) -> tuple[str, int | None]:
@@ -35,9 +46,11 @@ def resolve_game(
 ) -> int | None:
     """Search BGG for a game by name. Prompts user to pick if ambiguous."""
     raw_name, year = _parse_game_input(name)
-    results = client.search(raw_name)
+    results = _search_local(raw_name, conn)
     if not results:
-        print(f"  Warning: no BGG results for '{raw_name}', skipping.")
+        results = client.search(raw_name)
+    if not results:
+        print(f"  Warning: no results for '{raw_name}', skipping.")
         return None
 
     exact      = [r for r in results if r.name.lower() == raw_name.lower()]

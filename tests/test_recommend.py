@@ -53,6 +53,31 @@ def test_resolve_game_shows_menu_when_year_still_ambiguous(tmp_path, monkeypatch
     assert result == 2
 
 
+def test_resolve_game_searches_local_db_without_api_call(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    conn.execute("INSERT INTO games(bgg_id, name) VALUES (?, ?)", (266192, "Wingspan"))
+    conn.commit()
+    client = MagicMock()
+
+    result = resolve_game("Wingspan", client, conn)
+
+    assert result == 266192
+    client.search.assert_not_called()
+
+
+def test_resolve_game_falls_back_to_api_when_not_in_db(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    client = MagicMock()
+    client.search.return_value = [
+        GameSearchResult(bgg_id=999, name="Obscure Game", year=2020),
+    ]
+
+    result = resolve_game("Obscure Game", client, conn)
+
+    assert result == 999
+    client.search.assert_called_once_with("Obscure Game")
+
+
 def test_resolve_game_shows_full_menu_when_year_has_no_matches(tmp_path, monkeypatch):
     conn = open_db(tmp_path / "test.db")
     client = MagicMock()
