@@ -83,3 +83,19 @@ def test_fetch_returns_none_when_item_missing():
     client = BGGClient(session=session)
 
     assert client.fetch(999999) is None
+
+
+def test_fetch_retries_on_429():
+    session = MagicMock()
+    session.get.side_effect = [
+        _mock_response("", 429),
+        _mock_response("", 429),
+        _mock_response(FETCH_XML),
+    ]
+    client = BGGClient(session=session)
+
+    details = client.fetch(266192)
+
+    assert details is not None
+    assert details.bgg_id == 266192
+    assert session.get.call_count == 3

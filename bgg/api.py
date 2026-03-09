@@ -41,7 +41,8 @@ class BGGClient:
                 self._last_request = time.monotonic()
                 return ET.fromstring(resp.text)
             if resp.status_code == 429:
-                time.sleep(5 * (attempt + 1))
+                if attempt < 2:
+                    time.sleep(5 * (attempt + 1))
             else:
                 resp.raise_for_status()
 
