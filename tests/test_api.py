@@ -1,3 +1,5 @@
+import requests
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 from bgg.api import BGGClient, GameSearchResult, GameDetails
 
@@ -100,3 +102,26 @@ def test_fetch_retries_on_429():
     assert details is not None
     assert details.bgg_id == 266192
     assert session.get.call_count == 3
+
+
+def test_client_loads_bearer_token_from_file(tmp_path):
+    token_file = tmp_path / "token.json"
+    token_file.write_text('{"name": "test", "value": "my-secret-token"}')
+
+    session = requests.Session()
+    BGGClient(session=session, token_path=token_file)
+
+    assert session.headers["Authorization"] == "Bearer my-secret-token"
+
+
+def test_client_sends_bearer_token_in_requests(tmp_path):
+    token_file = tmp_path / "token.json"
+    token_file.write_text('{"name": "test", "value": "my-secret-token"}')
+
+    session = MagicMock()
+    session.get.return_value = _mock_response(SEARCH_XML)
+    BGGClient(session=session, token_path=token_file)
+
+    session.headers.__setitem__.assert_called_with(
+        "Authorization", "Bearer my-secret-token"
+    )

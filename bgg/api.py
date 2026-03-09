@@ -1,11 +1,14 @@
+import json
 import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
+from pathlib import Path
 
 import requests
 
-BGG_API_BASE    = "https://boardgamegeek.com/xmlapi2"
-RATE_LIMIT_SECS = 2.0
+BGG_API_BASE       = "https://boardgamegeek.com/xmlapi2"
+RATE_LIMIT_SECS    = 2.0
+DEFAULT_TOKEN_PATH = Path(__file__).parent.parent / "data" / "token.json"
 
 
 @dataclass(frozen=True)
@@ -25,9 +28,18 @@ class GameDetails:
 
 
 class BGGClient:
-    def __init__(self, session: requests.Session | None = None):
+    def __init__(
+        self,
+        session:    requests.Session | None = None,
+        token_path: Path | None = None,
+    ):
         self._session      = session or requests.Session()
         self._last_request = 0.0
+
+        path = token_path if token_path is not None else DEFAULT_TOKEN_PATH
+        if path.exists():
+            token = json.loads(path.read_text())["value"]
+            self._session.headers["Authorization"] = f"Bearer {token}"
 
     def _get(self, endpoint: str, params: dict) -> ET.Element:
         elapsed = time.monotonic() - self._last_request
