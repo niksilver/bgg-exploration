@@ -6,7 +6,7 @@ BATCH_SIZE = 10_000
 
 
 def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
-    """Bulk-import ratings from Kaggle CSV. Returns number of rows imported."""
+    """Bulk-import ratings from Kaggle CSV. Returns number of valid rows processed."""
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
 
@@ -17,12 +17,11 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
         reader = csv.DictReader(f)
         for row in reader:
             try:
-                rating = float(row["rating"])
+                rating  = float(row["rating"])
+                bgg_id  = int(row["ID"])
+                user_id = row["user"]
             except (ValueError, KeyError):
                 continue
-
-            bgg_id  = int(row["ID"])
-            user_id = row["user"]
             batch.append((user_id, bgg_id, rating))
 
             if len(batch) >= BATCH_SIZE:
