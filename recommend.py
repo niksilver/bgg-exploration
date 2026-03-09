@@ -82,6 +82,7 @@ def main() -> None:
     conn   = open_db(DB_PATH)
     client = BGGClient()
 
+    print("Powered by BGG")
     print("Resolving game names via BGG API…")
     liked_ids: list[int] = []
     for name in args.games:
