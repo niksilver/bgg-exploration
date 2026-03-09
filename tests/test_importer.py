@@ -1,5 +1,7 @@
 import csv
+import re
 import pytest
+from unittest.mock import patch
 from bgg.database import open_db
 from bgg.importer import import_ratings, build_stats
 
@@ -61,3 +63,22 @@ def test_build_stats_computes_high_rating_count(tmp_path):
         "SELECT value FROM metadata WHERE key='total_users'"
     ).fetchone()[0]
     assert total_users == "4"
+
+
+def test_import_ratings_prints_progress_every_second(tmp_path, capsys):
+    csv_path = tmp_path / "ratings.csv"
+    _write_csv(csv_path, [
+        {"user": "alice", "ID": "1", "name": "Wingspan", "rating": "9"},
+        {"user": "bob",   "ID": "1", "name": "Wingspan", "rating": "8"},
+        {"user": "carol", "ID": "2", "name": "Agricola", "rating": "7"},
+    ])
+    conn = open_db(tmp_path / "test.db")
+
+    # Simulate: init=0.0, row1 check=1.5s elapsed (triggers print),
+    # row2 check=1.5s (no change, no print), row3 check=1.5s (no print)
+    with patch("bgg.importer.time.monotonic", side_effect=[0.0, 1.5, 1.5, 1.5]):
+        import_ratings(csv_path, conn)
+
+    lines = [l for l in capsys.readouterr().out.splitlines() if "records" in l]
+    assert len(lines) == 1
+    assert re.match(r"\[\d{2}:\d{2}:\d{2}\] \d[\d,]* records processed", lines[0])

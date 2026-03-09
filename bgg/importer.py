@@ -1,8 +1,11 @@
 import csv
 import sqlite3
+import time
+from datetime import datetime
 from pathlib import Path
 
-BATCH_SIZE = 10_000
+BATCH_SIZE        = 10_000
+PROGRESS_INTERVAL = 1.0  # seconds
 
 
 def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
@@ -10,8 +13,9 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
 
-    imported = 0
-    batch    = []
+    imported      = 0
+    batch         = []
+    last_progress = time.monotonic()
 
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
@@ -22,14 +26,21 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
                 user_id = row["user"]
             except (ValueError, KeyError):
                 continue
+
             batch.append((user_id, bgg_id, rating))
+            imported += 1
+
+            now = time.monotonic()
+            if now - last_progress >= PROGRESS_INTERVAL:
+                ts = datetime.now().strftime("%H:%M:%S")
+                print(f"[{ts}] {imported:,} records processed")
+                last_progress = now
 
             if len(batch) >= BATCH_SIZE:
                 conn.executemany(
                     "INSERT OR IGNORE INTO ratings(user_id, bgg_id, rating) VALUES (?, ?, ?)",
                     batch,
                 )
-                imported += len(batch)
                 batch.clear()
 
     if batch:
@@ -37,7 +48,6 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
             "INSERT OR IGNORE INTO ratings(user_id, bgg_id, rating) VALUES (?, ?, ?)",
             batch,
         )
-        imported += len(batch)
 
     conn.commit()
     return imported
