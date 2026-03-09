@@ -94,7 +94,8 @@ def test_fetch_retries_on_429():
     ]
     client = BGGClient(session=session)
 
-    details = client.fetch(266192)
+    with patch("bgg.api.time.sleep"):
+        details = client.fetch(266192)
 
     assert details is not None
     assert details.bgg_id == 266192
