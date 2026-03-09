@@ -158,7 +158,9 @@ def main() -> None:
     for i, (bgg_id, lift) in enumerate(recommendations, 1):
         ensure_game_cached(bgg_id, client, conn)
         row = conn.execute(
-            "SELECT name, bgg_rank, rating_avg FROM games WHERE bgg_id = ?",
+            "SELECT g.name, g.bgg_rank, gs.rating_avg "
+            "FROM games g LEFT JOIN game_stats gs ON g.bgg_id = gs.bgg_id "
+            "WHERE g.bgg_id = ?",
             (bgg_id,),
         ).fetchone()
         name     = row[0] if row else f"BGG ID {bgg_id}"
