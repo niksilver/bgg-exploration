@@ -1,10 +1,11 @@
 # Board game recommendations
 
-Get board game recommendations, thanks to Board Game Geek.
+Get board game recommendations, thanks to Board Game Geek and user jvanelteren on Kaggle.
 
 Examples:
 ```
 python recommend.py "Wingspan" "Terraforming Mars" "Agricola"
+python recommend.py "Dominion (2008)"
 python recommend.py --help
 ```
 
