@@ -82,3 +82,15 @@ def test_import_ratings_prints_progress_every_second(tmp_path, capsys):
     lines = [l for l in capsys.readouterr().out.splitlines() if "records" in l]
     assert len(lines) == 1
     assert re.match(r"\[\d{2}:\d{2}:\d{2}\] \d[\d,]* records processed", lines[0])
+
+
+def test_import_ratings_raises_on_missing_columns(tmp_path):
+    csv_path = tmp_path / "wrong.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["ID", "Name", "Average"])
+        writer.writeheader()
+        writer.writerow({"ID": "30549", "Name": "Pandemic", "Average": "7.59"})
+    conn = open_db(tmp_path / "test.db")
+
+    with pytest.raises(ValueError, match="user.*rating"):
+        import_ratings(csv_path, conn)

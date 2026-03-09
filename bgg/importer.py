@@ -19,6 +19,14 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
 
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
+        required = {"user", "ID", "rating"}
+        missing  = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(
+                f"CSV is missing required columns: {sorted(missing)}. "
+                f"Expected columns: {sorted(required)}. "
+                f"Found: {sorted(reader.fieldnames or [])}."
+            )
         for row in reader:
             try:
                 rating  = float(row["rating"])
