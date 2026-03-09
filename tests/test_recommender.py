@@ -103,6 +103,28 @@ def test_min_avg_zero_means_no_filter(tmp_path):
     assert 3 in bgg_ids  # not filtered when min_avg=0.0
 
 
+def test_exclusions_filter_out_named_games(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    ratings = (
+        [(f"u{i}", 1, 9.0) for i in range(5)] +
+        [(f"u{i}", 2, 9.0) for i in range(5)] +
+        [(f"u{i}", 3, 9.0) for i in range(5)]
+    )
+    _seed(conn, ratings)
+    conn.executemany(
+        "INSERT OR IGNORE INTO games(bgg_id, name) VALUES (?, ?)",
+        [(1, "Wingspan"), (2, "Unmatched: Battle of Legends"), (3, "Agricola")],
+    )
+    conn.commit()
+
+    results = get_recommendations([1], conn, min_rating=8.0, min_fan_count=1,
+                                  exclusions=["Unmatched"])
+
+    bgg_ids = [r[0] for r in results]
+    assert 3 in bgg_ids      # Agricola → included
+    assert 2 not in bgg_ids  # Unmatched → excluded
+
+
 def test_min_fan_count_filters_obscure_games(tmp_path):
     conn = open_db(tmp_path / "test.db")
     ratings = (

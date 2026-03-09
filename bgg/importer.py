@@ -15,18 +15,21 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
 
     imported      = 0
     batch         = []
+    game_names:   dict[int, str] = {}
     last_progress = time.monotonic()
 
     with open(csv_path, newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        required = {"user", "ID", "rating"}
-        missing  = required - set(reader.fieldnames or [])
+        reader    = csv.DictReader(f)
+        fieldnames = reader.fieldnames or []
+        required  = {"user", "ID", "rating"}
+        missing   = required - set(fieldnames)
         if missing:
             raise ValueError(
                 f"CSV is missing required columns: {sorted(missing)}. "
                 f"Expected columns: {sorted(required)}. "
-                f"Found: {sorted(reader.fieldnames or [])}."
+                f"Found: {sorted(fieldnames)}."
             )
+        has_name = "name" in fieldnames
         for row in reader:
             try:
                 rating  = float(row["rating"])
@@ -34,6 +37,9 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
                 user_id = row["user"]
             except (ValueError, KeyError):
                 continue
+
+            if has_name and bgg_id not in game_names and row["name"]:
+                game_names[bgg_id] = row["name"]
 
             batch.append((user_id, bgg_id, rating))
             imported += 1
@@ -55,6 +61,12 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
         conn.executemany(
             "INSERT OR IGNORE INTO ratings(user_id, bgg_id, rating) VALUES (?, ?, ?)",
             batch,
+        )
+
+    if game_names:
+        conn.executemany(
+            "INSERT OR IGNORE INTO games(bgg_id, name) VALUES (?, ?)",
+            game_names.items(),
         )
 
     conn.commit()

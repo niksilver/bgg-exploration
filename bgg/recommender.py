@@ -4,10 +4,11 @@ import sqlite3
 def get_recommendations(
     liked_bgg_ids: list[int],
     conn:          sqlite3.Connection,
-    min_rating:    float = 8.0,
-    min_fan_count: int   = 100,
-    top_n:         int   = 10,
-    min_avg:       float = 0.0,
+    min_rating:    float     = 8.0,
+    min_fan_count: int       = 100,
+    top_n:         int       = 10,
+    min_avg:       float     = 0.0,
+    exclusions:    list[str] = [],
 ) -> list[tuple[int, float]]:
     """
     Return (bgg_id, lift) pairs sorted by lift descending.
@@ -34,7 +35,12 @@ def get_recommendations(
     if total_users == 0:
         return []
 
-    id_ph = ",".join("?" * len(liked_bgg_ids))
+    id_ph      = ",".join("?" * len(liked_bgg_ids))
+    excl_sql   = "".join(
+        "  AND (g.name IS NULL OR LOWER(g.name) NOT LIKE ?)\n"
+        for _ in exclusions
+    )
+    excl_params = [f"%{e.lower()}%" for e in exclusions]
 
     rows = conn.execute(f"""
         WITH
@@ -62,10 +68,11 @@ def get_recommendations(
           (CAST(gs.high_rating_count AS REAL) / ?)                     AS lift
         FROM  fan_high fh
         JOIN  game_stats gs  ON fh.bgg_id = gs.bgg_id
+        LEFT JOIN games g    ON fh.bgg_id = g.bgg_id
         CROSS JOIN n_fans nf
         WHERE gs.high_rating_count > 0
           AND (? = 0.0 OR gs.rating_avg >= ?)
-        ORDER BY lift DESC
+{excl_sql}        ORDER BY lift DESC
         LIMIT ?
     """, (
         *liked_bgg_ids, min_rating,          # fan_users CTE
@@ -73,6 +80,7 @@ def get_recommendations(
         min_fan_count,                       # HAVING
         total_users, total_users,            # base_rate + lift
         min_avg, min_avg,                    # min_avg filter
+        *excl_params,                        # exclusions
         top_n,
     )).fetchall()
 

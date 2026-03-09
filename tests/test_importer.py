@@ -102,6 +102,20 @@ def test_build_stats_computes_rating_avg(tmp_path):
     assert row[0] == pytest.approx(8.0)  # (9+7)/2 = 8.0
 
 
+def test_import_ratings_populates_game_names(tmp_path):
+    csv_path = tmp_path / "ratings.csv"
+    _write_csv(csv_path, [
+        {"user": "alice", "ID": "1", "name": "Wingspan", "rating": "9"},
+        {"user": "bob",   "ID": "2", "name": "Agricola", "rating": "8"},
+    ])
+    conn = open_db(tmp_path / "test.db")
+
+    import_ratings(csv_path, conn)
+
+    row = conn.execute("SELECT name FROM games WHERE bgg_id=1").fetchone()
+    assert row[0] == "Wingspan"
+
+
 def test_import_ratings_raises_on_missing_columns(tmp_path):
     csv_path = tmp_path / "wrong.csv"
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
