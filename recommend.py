@@ -45,7 +45,9 @@ def resolve_game(
     while True:
         try:
             choice = int(input("Enter number: ").strip())
-        except (ValueError, EOFError):
+        except EOFError:
+            return None
+        except ValueError:
             continue
         if choice == 0:
             return None
@@ -109,7 +111,7 @@ def main() -> None:
         sys.exit(0)
 
     print(f"{'#':<4}  {'Game':<45}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}")
-    print("─" * 72)
+    print("─" * 73)
     for rank, (bgg_id, lift) in enumerate(recommendations, 1):
         ensure_game_cached(bgg_id, client, conn)
         row = conn.execute(
