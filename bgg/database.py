@@ -48,13 +48,24 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE game_stats ADD COLUMN rating_avg REAL")
         conn.commit()
 
+    indexes = {row[0] for row in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'"
+    )}
+    if "idx_ratings_usr_rtg_bgg" not in indexes:
+        print("Building covering index on ratings (one-time, may take a minute)…")
+        conn.execute(
+            "CREATE INDEX idx_ratings_usr_rtg_bgg ON ratings(user_id, rating, bgg_id)"
+        )
+        conn.commit()
+
 
 def create_indexes(conn: sqlite3.Connection) -> None:
     """Create indexes after bulk import. Call once, after import_ratings."""
     conn.executescript("""
-        CREATE INDEX IF NOT EXISTS idx_ratings_bgg_id  ON ratings(bgg_id);
-        CREATE INDEX IF NOT EXISTS idx_ratings_user_id ON ratings(user_id);
-        CREATE INDEX IF NOT EXISTS idx_ratings_bgg_rtg ON ratings(bgg_id, rating);
+        CREATE INDEX IF NOT EXISTS idx_ratings_bgg_id      ON ratings(bgg_id);
+        CREATE INDEX IF NOT EXISTS idx_ratings_user_id     ON ratings(user_id);
+        CREATE INDEX IF NOT EXISTS idx_ratings_bgg_rtg     ON ratings(bgg_id, rating);
+        CREATE INDEX IF NOT EXISTS idx_ratings_usr_rtg_bgg ON ratings(user_id, rating, bgg_id);
     """)
     conn.commit()
 
