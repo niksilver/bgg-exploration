@@ -16,6 +16,10 @@ def get_recommendations(
 
     A lift of 3.0 means fans of the liked games are 3x more likely to
     love this game than the average BGG user.
+
+    min_fan_count: minimum number of fans (users who liked the input games)
+                   who also highly rated the candidate game. Filters out games
+                   with very few co-occurrence signals.
     """
     if not liked_bgg_ids:
         return []
@@ -47,26 +51,25 @@ def get_recommendations(
             WHERE   r.rating >= ?
               AND   r.bgg_id NOT IN ({id_ph})
             GROUP   BY r.bgg_id
+            HAVING  COUNT(*) >= ?
           )
         SELECT
-          gs.bgg_id,
-          CAST(COALESCE(fh.fan_high_count, 0) AS REAL) / nf.cnt        AS fan_rate,
+          fh.bgg_id,
+          CAST(fh.fan_high_count AS REAL) / nf.cnt                     AS fan_rate,
           CAST(gs.high_rating_count AS REAL) / ?                       AS base_rate,
-          (CAST(COALESCE(fh.fan_high_count, 0) AS REAL) / nf.cnt) /
+          (CAST(fh.fan_high_count AS REAL) / nf.cnt) /
           (CAST(gs.high_rating_count AS REAL) / ?)                     AS lift
-        FROM  game_stats gs
-        LEFT JOIN fan_high fh ON gs.bgg_id = fh.bgg_id
+        FROM  fan_high fh
+        JOIN  game_stats gs  ON fh.bgg_id = gs.bgg_id
         CROSS JOIN n_fans nf
-        WHERE gs.high_rating_count >= ?
-          AND gs.bgg_id NOT IN ({id_ph})
+        WHERE gs.high_rating_count > 0
         ORDER BY lift DESC
         LIMIT ?
     """, (
         *liked_bgg_ids, min_rating,          # fan_users CTE
         min_rating, *liked_bgg_ids,          # fan_high CTE
+        min_fan_count,                       # HAVING
         total_users, total_users,            # base_rate + lift
-        min_fan_count,                       # WHERE gs.high_rating_count >= ?
-        *liked_bgg_ids,                      # WHERE gs.bgg_id NOT IN (...)
         top_n,
     )).fetchall()
 

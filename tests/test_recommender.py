@@ -42,8 +42,8 @@ def test_recommends_game_with_high_lift(tmp_path):
     results = get_recommendations([1], conn, min_rating=8.0, min_fan_count=1)
 
     bgg_ids = [r[0] for r in results]
-    assert bgg_ids[0] == 2            # game 2 should rank first
-    assert 3 in bgg_ids               # game 3 should appear but lower
+    assert bgg_ids[0] == 2            # game 2 should rank first (high fan overlap)
+    assert 3 not in bgg_ids           # game 3 excluded: no fans of game 1 rated it
 
 
 def test_liked_games_excluded_from_results(tmp_path):
