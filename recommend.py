@@ -7,6 +7,7 @@ Usage:
 """
 
 import argparse
+import re
 import sqlite3
 import sys
 from pathlib import Path
@@ -19,27 +20,43 @@ DB_PATH    = Path("data/bgg.db")
 DEFAULT_N  = 10
 
 
+def _parse_game_input(raw: str) -> tuple[str, int | None]:
+    """Split 'Game Name (Year)' into ('Game Name', year), or return (raw, None)."""
+    m = re.match(r'^(.+?)\s*\((\d{4})\)\s*$', raw)
+    if m:
+        return m.group(1).strip(), int(m.group(2))
+    return raw.strip(), None
+
+
 def resolve_game(
     name:   str,
     client: BGGClient,
     conn:   sqlite3.Connection,
 ) -> int | None:
     """Search BGG for a game by name. Prompts user to pick if ambiguous."""
-    results = client.search(name)
+    raw_name, year = _parse_game_input(name)
+    results = client.search(raw_name)
     if not results:
-        print(f"  Warning: no BGG results for '{name}', skipping.")
+        print(f"  Warning: no BGG results for '{raw_name}', skipping.")
         return None
 
-    # Prefer exact case-insensitive match
-    exact = [r for r in results if r.name.lower() == name.lower()]
-    if len(exact) == 1:
+    exact      = [r for r in results if r.name.lower() == raw_name.lower()]
+    candidates = exact or results
+
+    if year is not None:
+        year_match = [r for r in candidates if r.year == year]
+        if len(year_match) == 1:
+            return year_match[0].bgg_id
+        if year_match:
+            candidates = year_match   # still ambiguous but narrowed by year
+    elif len(exact) == 1:
         return exact[0].bgg_id
 
-    candidates = (exact or results)[:5]
-    print(f"\nMultiple results for '{name}':")
+    candidates = candidates[:5]
+    print(f"\nMultiple results for '{raw_name}':")
     for i, r in enumerate(candidates, 1):
-        year = f" ({r.year})" if r.year else ""
-        print(f"  {i}. {r.name}{year}  [BGG ID {r.bgg_id}]")
+        yr = f" ({r.year})" if r.year else ""
+        print(f"  {i}. {r.name}{yr}  [BGG ID {r.bgg_id}]")
     print("  0. Skip")
 
     while True:
