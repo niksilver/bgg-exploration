@@ -1,6 +1,8 @@
 import sqlite3
 import pytest
-from bgg.database import open_db
+from unittest.mock import MagicMock
+from bgg.api import GameDetails
+from bgg.database import open_db, ensure_game_cached
 
 
 def test_open_db_creates_tables(tmp_path):
@@ -23,3 +25,33 @@ def test_open_db_is_idempotent(tmp_path):
     conn1.close()
     conn2 = open_db(db_path)  # must not raise
     conn2.close()
+
+
+def test_ensure_game_cached_inserts_on_first_call(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    details = GameDetails(bgg_id=266192, name="Wingspan", year=2019,
+                          rating_avg=8.07, bgg_rank=21)
+    client = MagicMock()
+    client.fetch.return_value = details
+
+    ensure_game_cached(266192, client, conn)
+
+    row = conn.execute(
+        "SELECT name, year_published, rating_avg, bgg_rank FROM games WHERE bgg_id=?",
+        (266192,),
+    ).fetchone()
+    assert row == ("Wingspan", 2019, 8.07, 21)
+    client.fetch.assert_called_once_with(266192)
+
+
+def test_ensure_game_cached_skips_api_if_already_present(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO games(bgg_id, name) VALUES (?, ?)", (266192, "Wingspan")
+    )
+    conn.commit()
+    client = MagicMock()
+
+    ensure_game_cached(266192, client, conn)
+
+    client.fetch.assert_not_called()

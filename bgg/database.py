@@ -48,3 +48,29 @@ def create_indexes(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_ratings_bgg_rtg ON ratings(bgg_id, rating);
     """)
     conn.commit()
+
+
+def ensure_game_cached(
+    bgg_id: int,
+    client,          # BGGClient — not type-hinted to avoid circular import
+    conn: sqlite3.Connection,
+) -> None:
+    """Fetch game details from BGG API and cache in `games` table if not already present."""
+    exists = conn.execute(
+        "SELECT 1 FROM games WHERE bgg_id = ?", (bgg_id,)
+    ).fetchone()
+    if exists:
+        return
+
+    details = client.fetch(bgg_id)
+    if details is None:
+        return
+
+    conn.execute(
+        """INSERT OR REPLACE INTO games
+               (bgg_id, name, year_published, rating_avg, bgg_rank)
+           VALUES (?, ?, ?, ?, ?)""",
+        (details.bgg_id, details.name, details.year,
+         details.rating_avg, details.bgg_rank),
+    )
+    conn.commit()
