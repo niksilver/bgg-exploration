@@ -50,4 +50,4 @@ Or as a one-liner:
 sqlite3 data/bgg.db "SELECT COUNT(*) FROM ratings;"
 ```
 
-![Powered by BGG](https://drive.google.com/file/d/1unpb690BONNJB5HXtJEHfO4Raz7I-5JO/view?usp=drive_link)
+![Powered by BGG](assets/powered_by_BGG_01_SM.png)
