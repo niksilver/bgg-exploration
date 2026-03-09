@@ -55,6 +55,12 @@ def resolve_game(
             return candidates[choice - 1].bgg_id
 
 
+def _is_excluded(name: str, exclusions: list[str]) -> bool:
+    """Return True if name contains any of the exclusion strings (case-insensitive)."""
+    name_lower = name.lower()
+    return any(e.lower() in name_lower for e in exclusions)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Recommend board games based on games you enjoy."
@@ -71,6 +77,10 @@ def main() -> None:
         "--min-avg", type=float, default=0.0,
         metavar="RATING",
         help="Minimum BGG average rating for recommended games (default: no minimum)",
+    )
+    parser.add_argument(
+        "--not", dest="exclusions", action="append", default=[], metavar="STRING",
+        help="Exclude games whose name contains STRING (case-insensitive, repeatable)",
     )
     args = parser.parse_args()
 
@@ -120,16 +130,20 @@ def main() -> None:
 
     print(f"{'#':<4}  {'Game':<45}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}")
     print("─" * 73)
-    for i, (bgg_id, lift) in enumerate(recommendations, 1):
+    displayed = 0
+    for bgg_id, lift in recommendations:
         ensure_game_cached(bgg_id, client, conn)
         row = conn.execute(
             "SELECT name, bgg_rank, rating_avg FROM games WHERE bgg_id = ?",
             (bgg_id,),
         ).fetchone()
-        name     = row[0] if row else f"BGG ID {bgg_id}"
+        name = row[0] if row else f"BGG ID {bgg_id}"
+        if _is_excluded(name, args.exclusions):
+            continue
+        displayed += 1
         bgg_rank = f"#{row[1]}" if row and row[1] else "N/A"
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
-        print(f"{i:<4}  {name:<45}  {lift:>5.2f}  {bgg_rank:>6}  {avg:>5}")
+        print(f"{displayed:<4}  {name:<45}  {lift:>5.2f}  {bgg_rank:>6}  {avg:>5}")
 
     conn.close()
 
