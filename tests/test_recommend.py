@@ -1,10 +1,7 @@
-from unittest.mock import MagicMock
-
 import pytest
 
-from bgg.api import GameSearchResult
 from bgg.database import open_db
-from recommend import _parse_game_input, resolve_game
+from recommend import _parse_game_input, resolve_game, GameSearchResult
 
 
 def test_parse_extracts_year():
@@ -27,66 +24,59 @@ def test_parse_year_after_subtitle():
 
 def test_resolve_game_uses_year_to_disambiguate(tmp_path):
     conn = open_db(tmp_path / "test.db")
-    client = MagicMock()
-    client.search.return_value = [
-        GameSearchResult(bgg_id=1, name="Catan", year=1995),
-        GameSearchResult(bgg_id=2, name="Catan", year=2015),
-    ]
+    conn.executemany(
+        "INSERT INTO games(bgg_id, name, year_published) VALUES (?, ?, ?)",
+        [(1, "Catan", 1995), (2, "Catan", 2015)],
+    )
+    conn.commit()
 
-    result = resolve_game("Catan (1995)", client, conn)
+    result = resolve_game("Catan (1995)", conn)
 
     assert result == 1
-    client.search.assert_called_once_with("Catan")
 
 
 def test_resolve_game_shows_menu_when_year_still_ambiguous(tmp_path, monkeypatch):
     conn = open_db(tmp_path / "test.db")
-    client = MagicMock()
-    client.search.return_value = [
-        GameSearchResult(bgg_id=1, name="Catan", year=1995),
-        GameSearchResult(bgg_id=2, name="Catan", year=1995),
-    ]
+    conn.executemany(
+        "INSERT INTO games(bgg_id, name, year_published) VALUES (?, ?, ?)",
+        [(1, "Catan", 1995), (2, "Catan", 1995)],
+    )
+    conn.commit()
     monkeypatch.setattr("builtins.input", lambda _: "2")
 
-    result = resolve_game("Catan (1995)", client, conn)
+    result = resolve_game("Catan (1995)", conn)
 
     assert result == 2
 
 
-def test_resolve_game_searches_local_db_without_api_call(tmp_path):
+def test_resolve_game_searches_local_db(tmp_path):
     conn = open_db(tmp_path / "test.db")
     conn.execute("INSERT INTO games(bgg_id, name) VALUES (?, ?)", (266192, "Wingspan"))
     conn.commit()
-    client = MagicMock()
 
-    result = resolve_game("Wingspan", client, conn)
+    result = resolve_game("Wingspan", conn)
 
     assert result == 266192
-    client.search.assert_not_called()
 
 
-def test_resolve_game_falls_back_to_api_when_not_in_db(tmp_path):
+def test_resolve_game_returns_none_when_not_in_db(tmp_path, capsys):
     conn = open_db(tmp_path / "test.db")
-    client = MagicMock()
-    client.search.return_value = [
-        GameSearchResult(bgg_id=999, name="Obscure Game", year=2020),
-    ]
 
-    result = resolve_game("Obscure Game", client, conn)
+    result = resolve_game("Obscure Game", conn)
 
-    assert result == 999
-    client.search.assert_called_once_with("Obscure Game")
+    assert result is None
+    assert "no results" in capsys.readouterr().out
 
 
 def test_resolve_game_shows_full_menu_when_year_has_no_matches(tmp_path, monkeypatch):
     conn = open_db(tmp_path / "test.db")
-    client = MagicMock()
-    client.search.return_value = [
-        GameSearchResult(bgg_id=1, name="Catan", year=1995),
-        GameSearchResult(bgg_id=2, name="Catan", year=2015),
-    ]
+    conn.executemany(
+        "INSERT INTO games(bgg_id, name, year_published) VALUES (?, ?, ?)",
+        [(1, "Catan", 1995), (2, "Catan", 2015)],
+    )
+    conn.commit()
     monkeypatch.setattr("builtins.input", lambda _: "1")
 
-    result = resolve_game("Catan (2000)", client, conn)  # no match for 2000
+    result = resolve_game("Catan (2000)", conn)  # no match for 2000
 
     assert result == 1  # falls back to full candidate list

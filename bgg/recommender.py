@@ -110,7 +110,7 @@ def get_recommendations(
           (CAST(gs.high_rating_count AS REAL) / ?)                     AS lift
         FROM  fan_high fh
         JOIN  game_stats gs  ON fh.bgg_id = gs.bgg_id
-        LEFT JOIN games g    ON fh.bgg_id = g.bgg_id
+        INNER JOIN games g   ON fh.bgg_id = g.bgg_id
         CROSS JOIN n_fans nf
         WHERE gs.high_rating_count > 0
           AND (? = 0.0 OR gs.rating_avg >= ?)

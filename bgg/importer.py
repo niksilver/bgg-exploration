@@ -73,6 +73,41 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
     return imported
 
 
+def import_game_details(csv_path: Path, conn: sqlite3.Connection) -> int:
+    """Import game metadata from games_detailed_info2025.csv. Returns number of rows imported."""
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        reader    = csv.DictReader(f)
+        fieldnames = reader.fieldnames or []
+        required  = {"id", "name", "yearpublished", "average", "Board Game Rank"}
+        missing   = required - set(fieldnames)
+        if missing:
+            raise ValueError(
+                f"CSV is missing required columns: {sorted(missing)}. "
+                f"Found: {sorted(fieldnames)}."
+            )
+
+        batch = []
+        for row in reader:
+            try:
+                bgg_id         = int(row["id"])
+                name           = row["name"].strip()
+                year_published = int(row["yearpublished"]) if row["yearpublished"].strip() else None
+                rating_avg     = float(row["average"])    if row["average"].strip()       else None
+                rank_str       = row["Board Game Rank"].strip()
+                bgg_rank       = int(rank_str) if rank_str.isdigit() else None
+            except (ValueError, KeyError):
+                continue
+            batch.append((bgg_id, name, year_published, rating_avg, bgg_rank))
+
+    conn.executemany(
+        """INSERT OR REPLACE INTO games(bgg_id, name, year_published, rating_avg, bgg_rank)
+           VALUES (?, ?, ?, ?, ?)""",
+        batch,
+    )
+    conn.commit()
+    return len(batch)
+
+
 def build_stats(conn: sqlite3.Connection, min_rating: float = 8.0) -> None:
     """Compute game_stats and total_users metadata. Call once after import."""
     conn.execute("""

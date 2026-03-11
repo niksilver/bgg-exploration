@@ -8,6 +8,11 @@ def _seed(conn, ratings):
     conn.executemany(
         "INSERT INTO ratings(user_id, bgg_id, rating) VALUES (?, ?, ?)", ratings
     )
+    bgg_ids = {r[1] for r in ratings}
+    conn.executemany(
+        "INSERT OR IGNORE INTO games(bgg_id, name) VALUES (?, ?)",
+        [(bid, f"Game {bid}") for bid in bgg_ids],
+    )
     conn.commit()
     # Build stats with threshold 8.0
     conn.execute("""
@@ -112,7 +117,7 @@ def test_exclusions_filter_out_named_games(tmp_path):
     )
     _seed(conn, ratings)
     conn.executemany(
-        "INSERT OR IGNORE INTO games(bgg_id, name) VALUES (?, ?)",
+        "INSERT OR REPLACE INTO games(bgg_id, name) VALUES (?, ?)",
         [(1, "Wingspan"), (2, "Unmatched: Battle of Legends"), (3, "Agricola")],
     )
     conn.commit()

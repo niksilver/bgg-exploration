@@ -3,7 +3,17 @@ import re
 import pytest
 from unittest.mock import patch
 from bgg.database import open_db
-from bgg.importer import import_ratings, build_stats
+from bgg.importer import import_ratings, build_stats, import_game_details
+
+
+def _write_games_csv(path, rows):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["", "id", "name", "yearpublished", "average", "Board Game Rank"],
+        )
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def _write_csv(path, rows):
@@ -114,6 +124,48 @@ def test_import_ratings_populates_game_names(tmp_path):
 
     row = conn.execute("SELECT name FROM games WHERE bgg_id=1").fetchone()
     assert row[0] == "Wingspan"
+
+
+def test_import_game_details_inserts_rows(tmp_path):
+    csv_path = tmp_path / "games.csv"
+    _write_games_csv(csv_path, [
+        {"": 0, "id": "266192", "name": "Wingspan",         "yearpublished": "2019", "average": "8.07", "Board Game Rank": "21"},
+        {"": 1, "id": "167791", "name": "Terraforming Mars","yearpublished": "2016", "average": "8.35", "Board Game Rank": "4"},
+    ])
+    conn = open_db(tmp_path / "test.db")
+
+    count = import_game_details(csv_path, conn)
+
+    assert count == 2
+    row = conn.execute(
+        "SELECT name, year_published, rating_avg, bgg_rank FROM games WHERE bgg_id=266192"
+    ).fetchone()
+    assert row == ("Wingspan", 2019, pytest.approx(8.07), 21)
+
+
+def test_import_game_details_handles_missing_rank(tmp_path):
+    csv_path = tmp_path / "games.csv"
+    _write_games_csv(csv_path, [
+        {"": 0, "id": "12345", "name": "Obscure Game", "yearpublished": "2000", "average": "6.5", "Board Game Rank": "Not Ranked"},
+    ])
+    conn = open_db(tmp_path / "test.db")
+
+    import_game_details(csv_path, conn)
+
+    row = conn.execute("SELECT bgg_rank FROM games WHERE bgg_id=12345").fetchone()
+    assert row[0] is None
+
+
+def test_import_game_details_raises_on_missing_columns(tmp_path):
+    csv_path = tmp_path / "wrong.csv"
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["id", "name"])
+        writer.writeheader()
+        writer.writerow({"id": "1", "name": "Foo"})
+    conn = open_db(tmp_path / "test.db")
+
+    with pytest.raises(ValueError, match="yearpublished"):
+        import_game_details(csv_path, conn)
 
 
 def test_import_ratings_raises_on_missing_columns(tmp_path):

@@ -10,14 +10,21 @@ import argparse
 import re
 import sqlite3
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
-from bgg.api import BGGClient, GameSearchResult
-from bgg.database import ensure_game_cached, open_db
+from bgg.database import open_db
 from bgg.recommender import get_recommendations
 
 DB_PATH    = Path("data/bgg.db")
 DEFAULT_N  = 10
+
+
+@dataclass(frozen=True)
+class GameSearchResult:
+    bgg_id: int
+    name:   str
+    year:   int | None
 
 
 def _search_local(raw_name: str, conn: sqlite3.Connection) -> list[GameSearchResult]:
@@ -40,15 +47,12 @@ def _parse_game_input(raw: str) -> tuple[str, int | None]:
 
 
 def resolve_game(
-    name:   str,
-    client: BGGClient,
-    conn:   sqlite3.Connection,
+    name: str,
+    conn: sqlite3.Connection,
 ) -> int | None:
-    """Search BGG for a game by name. Prompts user to pick if ambiguous."""
+    """Search the local database for a game by name. Prompts user to pick if ambiguous."""
     raw_name, year = _parse_game_input(name)
     results = _search_local(raw_name, conn)
-    if not results:
-        results = client.search(raw_name)
     if not results:
         print(f"  Warning: no results for '{raw_name}', skipping.")
         return None
@@ -111,23 +115,19 @@ def main() -> None:
     if not DB_PATH.exists():
         print(
             "Error: ratings database not found.\n\n"
-            "Download the BGG Reviews dataset from:\n"
-            "  https://www.kaggle.com/datasets/jvanelteren/boardgamegeek-reviews\n\n"
-            "Then run:\n"
-            "  python import_ratings.py <path-to-csv>\n"
+            "Download the BGG datasets from Kaggle and run:\n"
+            "  python import_ratings.py <path-to-bgg-reviews.csv>\n"
+            "  python import_games.py <path-to-games_detailed_info2025.csv>\n"
         )
         sys.exit(1)
 
-    conn   = open_db(DB_PATH)
-    client = BGGClient()
+    conn = open_db(DB_PATH)
 
-    print("Powered by BGG")
     print("Resolving game names…")
     liked_ids: list[int] = []
     for name in args.games:
-        bgg_id = resolve_game(name, client, conn)
+        bgg_id = resolve_game(name, conn)
         if bgg_id is not None:
-            ensure_game_cached(bgg_id, client, conn)
             liked_ids.append(bgg_id)
 
     if not liked_ids:
@@ -156,7 +156,6 @@ def main() -> None:
     print(f"{'#':<4}  {'Game':<45}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}")
     print("─" * 73)
     for i, (bgg_id, lift) in enumerate(recommendations, 1):
-        ensure_game_cached(bgg_id, client, conn)
         row = conn.execute(
             "SELECT g.name, g.bgg_rank, gs.rating_avg "
             "FROM games g LEFT JOIN game_stats gs ON g.bgg_id = gs.bgg_id "
