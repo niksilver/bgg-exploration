@@ -34,19 +34,14 @@ CREATE TABLE ratings (
     PRIMARY KEY (user_id, bgg_id)
 );
 
-CREATE TABLE game_stats (
-    bgg_id            INTEGER PRIMARY KEY,
-    high_rating_count INTEGER NOT NULL,
-    total_raters      INTEGER NOT NULL,
-    rating_avg        REAL
-);
-
 CREATE TABLE games (
-    bgg_id         INTEGER PRIMARY KEY,
-    name           TEXT    NOT NULL,
-    year_published INTEGER,
-    rating_avg     REAL,
-    bgg_rank       INTEGER
+    bgg_id            INTEGER PRIMARY KEY,
+    name              TEXT    NOT NULL,
+    year_published    INTEGER,
+    bgg_rank          INTEGER,
+    high_rating_count INTEGER,
+    total_raters      INTEGER,
+    rating_avg        REAL
 );
 
 CREATE TABLE metadata (
@@ -55,7 +50,9 @@ CREATE TABLE metadata (
 );
 ```
 
-`ratings` and `game_stats` are populated from the reviews CSV. `games` is populated from the game metadata CSV. A covering index on `ratings(user_id, rating, bgg_id)` is the key performance optimisation for the recommendation query.
+The `games` table holds both metadata (name, year, rank — from the game details CSV) and computed stats (high_rating_count, total_raters, rating_avg — computed from the ratings CSV). Each import script updates only its own columns using upsert, so they can be run in any order without overwriting each other's data.
+
+A covering index on `ratings(user_id, rating, bgg_id)` is the key performance optimisation for the recommendation query.
 
 ## Recommendation Algorithm
 

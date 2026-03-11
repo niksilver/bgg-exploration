@@ -8,20 +8,20 @@ def _seed(conn, ratings):
     conn.executemany(
         "INSERT INTO ratings(user_id, bgg_id, rating) VALUES (?, ?, ?)", ratings
     )
-    bgg_ids = {r[1] for r in ratings}
-    conn.executemany(
-        "INSERT OR IGNORE INTO games(bgg_id, name) VALUES (?, ?)",
-        [(bid, f"Game {bid}") for bid in bgg_ids],
-    )
     conn.commit()
-    # Build stats with threshold 8.0
+    # Build stats with threshold 8.0 (upsert preserves any existing name/metadata)
     conn.execute("""
-        INSERT OR REPLACE INTO game_stats (bgg_id, high_rating_count, total_raters, rating_avg)
+        INSERT INTO games(bgg_id, name, high_rating_count, total_raters, rating_avg)
         SELECT bgg_id,
+               'Game ' || bgg_id,
                COUNT(CASE WHEN rating >= 8.0 THEN 1 END),
                COUNT(*),
                AVG(rating)
         FROM ratings GROUP BY bgg_id
+        ON CONFLICT(bgg_id) DO UPDATE SET
+            high_rating_count = excluded.high_rating_count,
+            total_raters      = excluded.total_raters,
+            rating_avg        = excluded.rating_avg
     """)
     total = conn.execute(
         "SELECT COUNT(DISTINCT user_id) FROM ratings"
@@ -117,8 +117,8 @@ def test_exclusions_filter_out_named_games(tmp_path):
     )
     _seed(conn, ratings)
     conn.executemany(
-        "INSERT OR REPLACE INTO games(bgg_id, name) VALUES (?, ?)",
-        [(1, "Wingspan"), (2, "Unmatched: Battle of Legends"), (3, "Agricola")],
+        "UPDATE games SET name=? WHERE bgg_id=?",
+        [("Wingspan", 1), ("Unmatched: Battle of Legends", 2), ("Agricola", 3)],
     )
     conn.commit()
 

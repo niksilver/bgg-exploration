@@ -65,7 +65,7 @@ def test_build_stats_computes_high_rating_count(tmp_path):
     build_stats(conn, min_rating=8.0)
 
     row = conn.execute(
-        "SELECT high_rating_count, total_raters FROM game_stats WHERE bgg_id=1"
+        "SELECT high_rating_count, total_raters FROM games WHERE bgg_id=1"
     ).fetchone()
     assert row == (2, 3)  # alice+bob >= 8; carol < 8
 
@@ -107,7 +107,7 @@ def test_build_stats_computes_rating_avg(tmp_path):
     build_stats(conn, min_rating=8.0)
 
     row = conn.execute(
-        "SELECT rating_avg FROM game_stats WHERE bgg_id=1"
+        "SELECT rating_avg FROM games WHERE bgg_id=1"
     ).fetchone()
     assert row[0] == pytest.approx(8.0)  # (9+7)/2 = 8.0
 
@@ -138,9 +138,9 @@ def test_import_game_details_inserts_rows(tmp_path):
 
     assert count == 2
     row = conn.execute(
-        "SELECT name, year_published, rating_avg, bgg_rank FROM games WHERE bgg_id=266192"
+        "SELECT name, year_published, bgg_rank FROM games WHERE bgg_id=266192"
     ).fetchone()
-    assert row == ("Wingspan", 2019, pytest.approx(8.07), 21)
+    assert row == ("Wingspan", 2019, 21)
 
 
 def test_import_game_details_handles_missing_rank(tmp_path):
@@ -154,6 +154,49 @@ def test_import_game_details_handles_missing_rank(tmp_path):
 
     row = conn.execute("SELECT bgg_rank FROM games WHERE bgg_id=12345").fetchone()
     assert row[0] is None
+
+
+def test_build_stats_does_not_overwrite_game_metadata(tmp_path):
+    """build_stats should update stats columns without wiping name/year/rank."""
+    conn = open_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO games(bgg_id, name, year_published, bgg_rank) VALUES (?, ?, ?, ?)",
+        (1, "Wingspan", 2019, 21),
+    )
+    conn.commit()
+    conn.execute(
+        "INSERT INTO ratings(user_id, bgg_id, rating) VALUES ('alice', 1, 9.0)"
+    )
+    conn.commit()
+
+    build_stats(conn, min_rating=8.0)
+
+    row = conn.execute(
+        "SELECT name, year_published, bgg_rank, high_rating_count FROM games WHERE bgg_id=1"
+    ).fetchone()
+    assert row == ("Wingspan", 2019, 21, 1)
+
+
+def test_import_game_details_does_not_overwrite_stats(tmp_path):
+    """import_game_details should update metadata columns without wiping computed stats."""
+    csv_path = tmp_path / "games.csv"
+    _write_games_csv(csv_path, [
+        {"": 0, "id": "266192", "name": "Wingspan", "yearpublished": "2019",
+         "average": "8.07", "Board Game Rank": "21"},
+    ])
+    conn = open_db(tmp_path / "test.db")
+    conn.execute(
+        "INSERT INTO games(bgg_id, name, high_rating_count, total_raters, rating_avg) "
+        "VALUES (266192, 'Wingspan', 50, 100, 8.5)"
+    )
+    conn.commit()
+
+    import_game_details(csv_path, conn)
+
+    row = conn.execute(
+        "SELECT high_rating_count, total_raters, rating_avg FROM games WHERE bgg_id=266192"
+    ).fetchone()
+    assert row == (50, 100, pytest.approx(8.5))  # stats preserved
 
 
 def test_import_game_details_raises_on_missing_columns(tmp_path):

@@ -76,10 +76,10 @@ def import_ratings(csv_path: Path, conn: sqlite3.Connection) -> int:
 def import_game_details(csv_path: Path, conn: sqlite3.Connection) -> int:
     """Import game metadata from games_detailed_info2025.csv. Returns number of rows imported."""
     with open(csv_path, newline="", encoding="utf-8") as f:
-        reader    = csv.DictReader(f)
+        reader     = csv.DictReader(f)
         fieldnames = reader.fieldnames or []
-        required  = {"id", "name", "yearpublished", "average", "Board Game Rank"}
-        missing   = required - set(fieldnames)
+        required   = {"id", "name", "yearpublished", "Board Game Rank"}
+        missing    = required - set(fieldnames)
         if missing:
             raise ValueError(
                 f"CSV is missing required columns: {sorted(missing)}. "
@@ -92,16 +92,19 @@ def import_game_details(csv_path: Path, conn: sqlite3.Connection) -> int:
                 bgg_id         = int(row["id"])
                 name           = row["name"].strip()
                 year_published = int(row["yearpublished"]) if row["yearpublished"].strip() else None
-                rating_avg     = float(row["average"])    if row["average"].strip()       else None
                 rank_str       = row["Board Game Rank"].strip()
                 bgg_rank       = int(rank_str) if rank_str.isdigit() else None
             except (ValueError, KeyError):
                 continue
-            batch.append((bgg_id, name, year_published, rating_avg, bgg_rank))
+            batch.append((bgg_id, name, year_published, bgg_rank))
 
     conn.executemany(
-        """INSERT OR REPLACE INTO games(bgg_id, name, year_published, rating_avg, bgg_rank)
-           VALUES (?, ?, ?, ?, ?)""",
+        """INSERT INTO games(bgg_id, name, year_published, bgg_rank)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(bgg_id) DO UPDATE SET
+               name           = excluded.name,
+               year_published = excluded.year_published,
+               bgg_rank       = excluded.bgg_rank""",
         batch,
     )
     conn.commit()
@@ -109,16 +112,21 @@ def import_game_details(csv_path: Path, conn: sqlite3.Connection) -> int:
 
 
 def build_stats(conn: sqlite3.Connection, min_rating: float = 8.0) -> None:
-    """Compute game_stats and total_users metadata. Call once after import."""
+    """Compute stats columns in games and total_users metadata. Call once after import."""
     conn.execute("""
-        INSERT OR REPLACE INTO game_stats (bgg_id, high_rating_count, total_raters, rating_avg)
+        INSERT INTO games(bgg_id, name, high_rating_count, total_raters, rating_avg)
         SELECT
             bgg_id,
+            'Game ' || bgg_id,
             COUNT(CASE WHEN rating >= ? THEN 1 END),
             COUNT(*),
             AVG(rating)
         FROM ratings
         GROUP BY bgg_id
+        ON CONFLICT(bgg_id) DO UPDATE SET
+            high_rating_count = excluded.high_rating_count,
+            total_raters      = excluded.total_raters,
+            rating_avg        = excluded.rating_avg
     """, (min_rating,))
 
     total_users = conn.execute(

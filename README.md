@@ -44,7 +44,7 @@ Useful commands inside the shell:
 
 ```sql
 .tables                          -- list all tables
-.schema game_stats               -- show table definition
+.schema games                    -- show table definition
 .mode column                     -- aligned output
 .headers on                      -- show column names
 
@@ -52,7 +52,7 @@ SELECT COUNT(*) FROM ratings;
 SELECT COUNT(*) FROM games;
 SELECT value FROM metadata WHERE key = 'total_users';
 
-SELECT * FROM game_stats ORDER BY high_rating_count DESC LIMIT 10;
+SELECT name, high_rating_count, rating_avg FROM games ORDER BY high_rating_count DESC LIMIT 10;
 ```
 
 Or as a one-liner:

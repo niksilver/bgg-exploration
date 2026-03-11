@@ -104,16 +104,15 @@ def get_recommendations(
         --               {excl_sql.strip() or '(none)'}.
         SELECT
           fh.bgg_id,
-          CAST(fh.fan_high_count AS REAL) / nf.cnt                     AS fan_rate,
-          CAST(gs.high_rating_count AS REAL) / ?                       AS base_rate,
+          CAST(fh.fan_high_count AS REAL) / nf.cnt                    AS fan_rate,
+          CAST(g.high_rating_count AS REAL) / ?                       AS base_rate,
           (CAST(fh.fan_high_count AS REAL) / nf.cnt) /
-          (CAST(gs.high_rating_count AS REAL) / ?)                     AS lift
+          (CAST(g.high_rating_count AS REAL) / ?)                     AS lift
         FROM  fan_high fh
-        JOIN  game_stats gs  ON fh.bgg_id = gs.bgg_id
         INNER JOIN games g   ON fh.bgg_id = g.bgg_id
         CROSS JOIN n_fans nf
-        WHERE gs.high_rating_count > 0
-          AND (? = 0.0 OR gs.rating_avg >= ?)
+        WHERE g.high_rating_count > 0
+          AND (? = 0.0 OR g.rating_avg >= ?)
 {excl_sql}        ORDER BY lift DESC
         LIMIT ?
     """, (

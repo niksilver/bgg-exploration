@@ -157,9 +157,7 @@ def main() -> None:
     print("─" * 73)
     for i, (bgg_id, lift) in enumerate(recommendations, 1):
         row = conn.execute(
-            "SELECT g.name, g.bgg_rank, gs.rating_avg "
-            "FROM games g LEFT JOIN game_stats gs ON g.bgg_id = gs.bgg_id "
-            "WHERE g.bgg_id = ?",
+            "SELECT name, bgg_rank, rating_avg FROM games WHERE bgg_id = ?",
             (bgg_id,),
         ).fetchone()
         name     = row[0] if row else f"BGG ID {bgg_id}"
