@@ -10,6 +10,7 @@ import argparse
 import re
 import sqlite3
 import sys
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from bgg.recommender import get_recommendations
 
 DB_PATH    = Path("data/bgg.db")
 DEFAULT_N  = 10
+NAME_W     = 45
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,26 @@ class GameSearchResult:
     bgg_id: int
     name:   str
     year:   int | None
+
+
+def _format_row(
+    i:          int,
+    name:       str,
+    lift:       float,
+    bgg_rank:   str,
+    avg:        str,
+    name_width: int = NAME_W,
+) -> str:
+    """Format one recommendation row, wrapping long names across multiple lines."""
+    stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}"
+    lines = textwrap.wrap(name, name_width) or [""]
+    if len(lines) == 1:
+        return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
+    parts = [f"{i:<4}  {lines[0]}"]
+    for line in lines[1:-1]:
+        parts.append(f"      {line}")
+    parts.append(f"      {lines[-1]:<{name_width}}  {stats}")
+    return "\n".join(parts)
 
 
 def _search_local(raw_name: str, conn: sqlite3.Connection) -> list[GameSearchResult]:
@@ -153,7 +175,7 @@ def main() -> None:
         conn.close()
         sys.exit(0)
 
-    print(f"{'#':<4}  {'Game':<45}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}")
+    print(f"{'#':<4}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}")
     print("─" * 73)
     for i, (bgg_id, lift) in enumerate(recommendations, 1):
         row = conn.execute(
@@ -163,7 +185,7 @@ def main() -> None:
         name     = row[0] if row else f"BGG ID {bgg_id}"
         bgg_rank = f"#{row[1]}" if row and row[1] else "N/A"
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
-        print(f"{i:<4}  {name:<45}  {lift:>5.2f}  {bgg_rank:>6}  {avg:>5}")
+        print(_format_row(i, name, lift, bgg_rank, avg))
 
     conn.close()
 

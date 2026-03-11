@@ -1,7 +1,32 @@
 import pytest
 
 from bgg.database import open_db
-from recommend import _parse_game_input, resolve_game, GameSearchResult
+from recommend import _format_row, _parse_game_input, resolve_game, GameSearchResult
+
+
+def test_format_row_short_name_single_line():
+    """A name that fits within name_width produces a single line with stats at the end."""
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", name_width=10)
+    assert "\n" not in row
+    assert "Wingspan" in row
+    assert "3.45" in row
+
+
+def test_format_row_long_name_wraps():
+    """A name longer than name_width wraps; stats appear only on the last line."""
+    row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", name_width=10)
+    lines = row.split("\n")
+    assert len(lines) > 1
+    assert "1.50" in lines[-1]
+    assert "1.50" not in lines[0]
+
+
+def test_format_row_continuation_lines_indented():
+    """Continuation lines of a wrapped name are indented to align with the name column."""
+    row = _format_row(1, "A Very Long Game Name", 1.50, "N/A", "7.50", name_width=10)
+    lines = row.split("\n")
+    for line in lines[1:]:
+        assert line.startswith("      ")
 
 
 def test_parse_extracts_year():
