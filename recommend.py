@@ -122,7 +122,7 @@ def main() -> None:
     client = BGGClient()
 
     print("Powered by BGG")
-    print("Resolving game names via BGG API…")
+    print("Resolving game names…")
     liked_ids: list[int] = []
     for name in args.games:
         bgg_id = resolve_game(name, client, conn)
