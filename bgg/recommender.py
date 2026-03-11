@@ -44,12 +44,25 @@ def get_recommendations(
 
     rows = conn.execute(f"""
         WITH
+          -- Step 1: Identify the "fans" — users who gave at least one of the
+          -- input games a high rating. These are the people whose tastes we are
+          -- trying to match. Every subsequent calculation is scoped to this group.
           fan_users AS (
             SELECT DISTINCT user_id
             FROM   ratings
             WHERE  bgg_id IN ({id_ph}) AND rating >= ?
           ),
+
+          -- Step 2: Count the fans. Stored as a single-row CTE so we can
+          -- reference it as a scalar value in the final SELECT without a
+          -- correlated subquery.
           n_fans(cnt) AS (SELECT COUNT(*) FROM fan_users),
+
+          -- Step 3: For each candidate game, count how many fans gave it a
+          -- high rating. We exclude the input games themselves (they must not
+          -- appear in the recommendations), and we require a minimum number of
+          -- fan votes (min_fan_count) to filter out games with too little
+          -- co-occurrence signal.
           fan_high AS (
             SELECT  r.bgg_id,
                     COUNT(*) AS fan_high_count
@@ -60,6 +73,32 @@ def get_recommendations(
             GROUP   BY r.bgg_id
             HAVING  COUNT(*) >= ?
           )
+
+        -- Step 4: Compute lift for every candidate game that survived the
+        -- fan_high filter.
+        --
+        -- fan_rate  = fan_high_count / n_fans
+        --           = the fraction of fans who gave this game a high rating.
+        --
+        -- base_rate = gs.high_rating_count / total_users
+        --           = the fraction of ALL users in the dataset who gave this
+        --             game a high rating. Pre-computed in game_stats so we
+        --             don't have to scan the full ratings table here.
+        --
+        -- lift      = fan_rate / base_rate
+        --           = how much more likely fans of the input games are to love
+        --             this game compared with a randomly chosen user. A lift of
+        --             3.0 means fans are three times as likely to rate it highly.
+        --
+        -- We exclude games where high_rating_count is zero to avoid division
+        -- by zero in the base_rate calculation.
+        --
+        -- Optional filters:
+        --   min_avg   — skip games whose average Kaggle rating falls below the
+        --               threshold. The (? = 0.0 OR ...) pattern means a value
+        --               of 0.0 disables the filter entirely.
+        --   exclusions — one NOT LIKE clause per --not argument, injected as
+        --               {excl_sql.strip() or '(none)'}.
         SELECT
           fh.bgg_id,
           CAST(fh.fan_high_count AS REAL) / nf.cnt                     AS fan_rate,
