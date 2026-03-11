@@ -52,6 +52,23 @@ def test_recommends_game_with_high_lift(tmp_path):
     assert 3 not in bgg_ids           # game 3 excluded: no fans of game 1 rated it
 
 
+def test_fan_avg_reflects_all_fan_ratings(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    # 3 fans of game 1; they rate game 2 with mixed scores (not all high)
+    ratings = (
+        [(f"u{i}", 1, 9.0) for i in range(3)] +    # 3 fans of game 1
+        [("u0", 2, 9.0), ("u1", 2, 7.0), ("u2", 2, 5.0)]  # fans' mixed ratings of game 2
+    )
+    _seed(conn, ratings)
+
+    results = get_recommendations([1], conn, min_rating=8.0, min_fan_count=1)
+
+    assert len(results) == 1
+    bgg_id, lift, fan_avg = results[0]
+    assert bgg_id == 2
+    assert fan_avg == pytest.approx((9.0 + 7.0 + 5.0) / 3)
+
+
 def test_liked_games_excluded_from_results(tmp_path):
     conn = open_db(tmp_path / "test.db")
     ratings = (

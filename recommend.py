@@ -35,10 +35,11 @@ def _format_row(
     lift:       float,
     bgg_rank:   str,
     avg:        str,
+    fan_avg:    str,
     name_width: int = NAME_W,
 ) -> str:
     """Format one recommendation row, wrapping long names across multiple lines."""
-    stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}"
+    stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
     lines = textwrap.wrap(name, name_width) or [""]
     if len(lines) == 1:
         return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
@@ -175,9 +176,10 @@ def main() -> None:
         conn.close()
         sys.exit(0)
 
-    print(f"{'#':<4}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}")
-    print("─" * 73)
-    for i, (bgg_id, lift) in enumerate(recommendations, 1):
+    print(f"{'':75}{'Fan':>4}")
+    print(f"{'#':<4}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
+    print("─" * 79)
+    for i, (bgg_id, lift, fan_avg_val) in enumerate(recommendations, 1):
         row = conn.execute(
             "SELECT name, bgg_rank, rating_avg FROM games WHERE bgg_id = ?",
             (bgg_id,),
@@ -185,7 +187,8 @@ def main() -> None:
         name     = row[0] if row else f"BGG ID {bgg_id}"
         bgg_rank = f"#{row[1]}" if row and row[1] else "N/A"
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
-        print(_format_row(i, name, lift, bgg_rank, avg))
+        fan_avg  = f"{fan_avg_val:.2f}" if fan_avg_val is not None else "N/A"
+        print(_format_row(i, name, lift, bgg_rank, avg, fan_avg))
 
     conn.close()
 

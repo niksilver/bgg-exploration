@@ -9,9 +9,9 @@ def get_recommendations(
     top_n:         int       = 10,
     min_avg:       float     = 0.0,
     exclusions:    list[str] = [],
-) -> list[tuple[int, float]]:
+) -> list[tuple[int, float, float]]:
     """
-    Return (bgg_id, lift) pairs sorted by lift descending.
+    Return (bgg_id, lift, fan_avg) triples sorted by lift descending.
 
     Lift = (fraction of fans who highly rated the game) /
            (fraction of all users who highly rated the game).
@@ -62,19 +62,18 @@ def get_recommendations(
           n_fans(cnt) AS (SELECT COUNT(*) FROM fan_users),
 
           -- Step 3: For each candidate game, count how many fans gave it a
-          -- high rating. We exclude the input games themselves (they must not
-          -- appear in the recommendations), and we require a minimum number of
-          -- fan votes (min_fan_count) to filter out games with too little
-          -- co-occurrence signal.
+          -- high rating, and compute the average of ALL fan ratings (not just
+          -- high ones). We exclude the input games themselves, and require a
+          -- minimum number of fan high-votes to filter out low-signal games.
           fan_high AS (
             SELECT  r.bgg_id,
-                    COUNT(*) AS fan_high_count
+                    COUNT(CASE WHEN r.rating >= ? THEN 1 END) AS fan_high_count,
+                    AVG(r.rating)                             AS fan_avg
             FROM    ratings r
             JOIN    fan_users fu ON r.user_id = fu.user_id
-            WHERE   r.rating >= ?
-              AND   r.bgg_id NOT IN ({id_ph})
+            WHERE   r.bgg_id NOT IN ({id_ph})
             GROUP   BY r.bgg_id
-            HAVING  COUNT(*) >= ?
+            HAVING  COUNT(CASE WHEN r.rating >= ? THEN 1 END) >= ?
           )
 
         -- Step 4: Compute lift for every candidate game that survived the
@@ -107,7 +106,8 @@ def get_recommendations(
           CAST(fh.fan_high_count AS REAL) / nf.cnt                    AS fan_rate,
           CAST(g.high_rating_count AS REAL) / ?                       AS base_rate,
           (CAST(fh.fan_high_count AS REAL) / nf.cnt) /
-          (CAST(g.high_rating_count AS REAL) / ?)                     AS lift
+          (CAST(g.high_rating_count AS REAL) / ?)                     AS lift,
+          fh.fan_avg
         FROM  fan_high fh
         INNER JOIN games g   ON fh.bgg_id = g.bgg_id
         CROSS JOIN n_fans nf
@@ -117,12 +117,12 @@ def get_recommendations(
         LIMIT ?
     """, (
         *liked_bgg_ids, min_rating,          # fan_users CTE
-        min_rating, *liked_bgg_ids,          # fan_high CTE
-        min_fan_count,                       # HAVING
+        min_rating, *liked_bgg_ids,          # fan_high CTE (COUNT CASE)
+        min_rating, min_fan_count,           # fan_high HAVING
         total_users, total_users,            # base_rate + lift
         min_avg, min_avg,                    # min_avg filter
         *excl_params,                        # exclusions
         top_n,
     )).fetchall()
 
-    return [(row[0], row[3]) for row in rows]
+    return [(row[0], row[3], row[4]) for row in rows]
