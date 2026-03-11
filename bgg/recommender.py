@@ -30,7 +30,10 @@ def get_recommendations(
         "SELECT value FROM metadata WHERE key = 'total_users'"
     ).fetchone()
     if row is None:
-        raise RuntimeError("Database has no 'total_users' metadata. Run build_stats first.")
+        raise RuntimeError(
+            "Database has no 'total_users' metadata. "
+            "Run: python import_ratings.py <path-to-csv>"
+        )
     total_users = int(row[0])
     if total_users == 0:
         return []
