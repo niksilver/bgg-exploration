@@ -147,6 +147,30 @@ def test_exclusions_filter_out_named_games(tmp_path):
     assert 2 not in bgg_ids  # Unmatched → excluded
 
 
+def test_multiple_exclusions_all_applied(tmp_path):
+    conn = open_db(tmp_path / "test.db")
+    ratings = (
+        [(f"u{i}", 1, 9.0) for i in range(5)] +
+        [(f"u{i}", 2, 9.0) for i in range(5)] +
+        [(f"u{i}", 3, 9.0) for i in range(5)] +
+        [(f"u{i}", 4, 9.0) for i in range(5)]
+    )
+    _seed(conn, ratings)
+    conn.executemany(
+        "UPDATE games SET name=? WHERE bgg_id=?",
+        [("Wingspan", 1), ("Unmatched: Cobble & Fog", 2), ("Dice Throne", 3), ("Agricola", 4)],
+    )
+    conn.commit()
+
+    results = get_recommendations([1], conn, min_rating=8.0, min_fan_count=1,
+                                  exclusions=["Unmatched", "Dice Throne"])
+
+    bgg_ids = [r[0] for r in results]
+    assert 4 in bgg_ids      # Agricola → included
+    assert 2 not in bgg_ids  # Unmatched → excluded by first exclusion
+    assert 3 not in bgg_ids  # Dice Throne → excluded by second exclusion
+
+
 def test_min_fan_count_filters_obscure_games(tmp_path):
     conn = open_db(tmp_path / "test.db")
     ratings = (

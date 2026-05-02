@@ -99,8 +99,7 @@ def get_recommendations(
         --   min_avg   — skip games whose average Kaggle rating falls below the
         --               threshold. The (? = 0.0 OR ...) pattern means a value
         --               of 0.0 disables the filter entirely.
-        --   exclusions — one NOT LIKE clause per --not argument, injected as
-        --               {excl_sql.strip() or '(none)'}.
+        --   exclusions — one NOT LIKE clause per --not argument.
         SELECT
           fh.bgg_id,
           CAST(fh.fan_high_count AS REAL) / nf.cnt                    AS fan_rate,
