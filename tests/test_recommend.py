@@ -9,8 +9,9 @@ from recommend import (
 
 
 def test_format_row_short_name_single_line():
-    """A name that fits within name_width produces a single line with stats at the end."""
-    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10)
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                      name_width=10,
+                      shown=frozenset({"order", "name", "lift", "rank", "avg", "fanavg"}))
     assert "\n" not in row
     assert "Wingspan" in row
     assert "3.45" in row
@@ -18,8 +19,9 @@ def test_format_row_short_name_single_line():
 
 
 def test_format_row_long_name_wraps():
-    """A name longer than name_width wraps; stats appear only on the last line."""
-    row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20", name_width=10)
+    row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20",
+                      name_width=10,
+                      shown=frozenset({"order", "name", "lift", "rank", "avg", "fanavg"}))
     lines = row.split("\n")
     assert len(lines) > 1
     assert "1.50" in lines[-1]
@@ -27,8 +29,8 @@ def test_format_row_long_name_wraps():
 
 
 def test_format_row_continuation_lines_indented():
-    """Continuation lines of a wrapped name are indented to align with the name column."""
-    row = _format_row(1, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20", name_width=10)
+    row = _format_row(1, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20",
+                      name_width=10)
     lines = row.split("\n")
     for line in lines[1:]:
         assert line.startswith("      ")
@@ -114,39 +116,44 @@ def test_resolve_game_shows_full_menu_when_year_has_no_matches(tmp_path, monkeyp
 
 def test_format_row_with_id_shows_id_between_rank_and_name():
     row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
-                      name_width=10, bgg_id=266192, show_id=True)
+                      name_width=10, bgg_id=266192,
+                      shown=frozenset({"order", "id", "name", "rank", "avg", "fanavg"}))
     assert "266192" in row
     assert row.index("266192") < row.index("Wingspan")
 
 
 def test_format_row_with_id_long_name_continuation_uses_wider_indent():
     row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20",
-                      name_width=10, bgg_id=12345, show_id=True)
+                      name_width=10, bgg_id=12345,
+                      shown=frozenset({"order", "id", "name", "rank", "avg", "fanavg"}))
     lines = row.split("\n")
     assert len(lines) > 1
     for line in lines[1:]:
         assert line.startswith("              ")  # 14 spaces
 
 
-def test_format_row_show_id_false_is_identical_to_default():
-    row_default = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10)
-    row_off     = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
-                              name_width=10, bgg_id=266192, show_id=False)
-    assert row_default == row_off
+def test_format_row_default_shown_excludes_id():
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                      name_width=10, bgg_id=266192)
+    assert "266192" not in row
 
 
 def test_format_row_with_lift_shows_lift_value():
-    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10, show_lift=True)
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                      name_width=10,
+                      shown=frozenset({"order", "name", "lift", "rank", "avg", "fanavg"}))
     assert "3.45" in row
 
 
 def test_format_row_without_lift_omits_lift_value():
-    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10, show_lift=False)
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                      name_width=10, shown=DEFAULT_COLUMNS)
     assert "3.45" not in row
 
 
 def test_format_row_without_lift_still_shows_rank_avg_fan_avg():
-    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10, show_lift=False)
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                      name_width=10, shown=DEFAULT_COLUMNS)
     assert "#21" in row
     assert "8.07" in row
     assert "8.50" in row
@@ -154,7 +161,7 @@ def test_format_row_without_lift_still_shows_rank_avg_fan_avg():
 
 def test_format_row_without_lift_long_name_wraps_with_stats_on_last_line():
     row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20",
-                      name_width=10, show_lift=False)
+                      name_width=10, shown=DEFAULT_COLUMNS)
     lines = row.split("\n")
     assert len(lines) > 1
     assert "1.50" not in lines[-1]

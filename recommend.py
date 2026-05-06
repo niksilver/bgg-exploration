@@ -64,35 +64,39 @@ def _format_row(
     fan_avg:    str,
     name_width: int = NAME_W,
     bgg_id:     int | None = None,
-    show_id:    bool = False,
-    show_lift:  bool = True,
+    shown:      frozenset[str] = DEFAULT_COLUMNS,
 ) -> str:
     """Format one recommendation row, wrapping long names across multiple lines."""
-    if show_lift:
-        stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
-    else:
-        stats = f"{bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
+    pre_parts = []
+    if "order" in shown:
+        pre_parts.append(f"{i:<4}")
+    if "id" in shown:
+        assert bgg_id is not None, "bgg_id must be provided when 'id' in shown"
+        pre_parts.append(f"{bgg_id:>6}")
+    prefix = ("  ".join(pre_parts) + "  ") if pre_parts else ""
+    indent = " " * len(prefix)
+
+    stat_parts = []
+    if "lift" in shown:
+        stat_parts.append(f"{lift:>5.2f}")
+    if "rank" in shown:
+        stat_parts.append(f"{bgg_rank:>6}")
+    if "avg" in shown:
+        stat_parts.append(f"{avg:>5}")
+    if "fanavg" in shown:
+        stat_parts.append(f"{fan_avg:>4}")
+    stats = "  ".join(stat_parts)
+
+    if "name" not in shown:
+        return (prefix + stats).rstrip()
+
     lines = textwrap.wrap(name, name_width) or [""]
-
-    if not show_id:
-        # No ID column
-        if len(lines) == 1:
-            return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
-        parts = [f"{i:<4}  {lines[0]}"]
-        for line in lines[1:-1]:
-            parts.append(f"      {line}")
-        parts.append(f"      {lines[-1]:<{name_width}}  {stats}")
-        return "\n".join(parts)
-
-    # With ID column
-    assert bgg_id is not None, "bgg_id must be provided when show_id=True"
-    id_prefix = f"{i:<4}  {bgg_id:>6}  "
     if len(lines) == 1:
-        return id_prefix + f"{lines[0]:<{name_width}}  {stats}"
-    parts = [id_prefix + lines[0]]
+        return prefix + f"{lines[0]:<{name_width}}  {stats}"
+    parts = [prefix + lines[0]]
     for line in lines[1:-1]:
-        parts.append(" " * len(id_prefix) + line)
-    parts.append(" " * len(id_prefix) + f"{lines[-1]:<{name_width}}  {stats}")
+        parts.append(indent + line)
+    parts.append(indent + f"{lines[-1]:<{name_width}}  {stats}")
     return "\n".join(parts)
 
 
