@@ -34,6 +34,7 @@ The first import takes a few minutes. Only games present in both datasets will a
 | `--min-avg RATING` | 0.0 (off) | Minimum average Kaggle rating for results |
 | `--not STRING` | — | Exclude games whose name contains STRING (repeatable) |
 | `--id` | off | Include BGG ID column in output (between `#` and game name) |
+| `--lift` | off | Include Lift column in output |
 
 ## Inspecting the database
 

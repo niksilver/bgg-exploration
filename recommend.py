@@ -39,9 +39,13 @@ def _format_row(
     name_width: int = NAME_W,
     bgg_id:     int | None = None,
     show_id:    bool = False,
+    show_lift:  bool = True,
 ) -> str:
     """Format one recommendation row, wrapping long names across multiple lines."""
-    stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
+    if show_lift:
+        stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
+    else:
+        stats = f"{bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
     lines = textwrap.wrap(name, name_width) or [""]
 
     if not show_id:
@@ -153,6 +157,10 @@ def main() -> None:
         "--id", action="store_true",
         help="Include BGG ID in output",
     )
+    parser.add_argument(
+        "--lift", action="store_true",
+        help="Include Lift column in output",
+    )
     args = parser.parse_args()
 
     if not DB_PATH.exists():
@@ -196,14 +204,15 @@ def main() -> None:
         conn.close()
         sys.exit(0)
 
-    if not args.id:
-        print(f"{'':75}{'Fan':>4}")
-        print(f"{'#':<4}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
-        print("─" * 79)
-    else:
-        print(f"{'':83}{'Fan':>4}")
-        print(f"{'#':<4}  {'ID':>6}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
-        print("─" * 87)
+    stats_w   = (7 if args.lift else 0) + 6 + 2 + 5 + 2 + 4
+    id_w      = 8 if args.id else 0
+    total_w   = 4 + 2 + id_w + NAME_W + 2 + stats_w
+    fan_pad   = total_w - 4
+    lift_hdr  = f"  {'Lift':>5}" if args.lift else ""
+    id_hdr    = f"  {'ID':>6}"   if args.id   else ""
+    print(f"{'':>{fan_pad}}{'Fan':>4}")
+    print(f"{'#':<4}{id_hdr}  {'Game':<{NAME_W}}{lift_hdr}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
+    print("─" * total_w)
     for i, (bgg_id, lift, fan_avg_val) in enumerate(recommendations, 1):
         row = conn.execute(
             "SELECT name, bgg_rank, rating_avg FROM games WHERE bgg_id = ?",
@@ -213,7 +222,8 @@ def main() -> None:
         bgg_rank = f"#{row[1]}" if row and row[1] else "N/A"
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
         fan_avg  = f"{fan_avg_val:.2f}" if fan_avg_val is not None else "N/A"
-        print(_format_row(i, name, lift, bgg_rank, avg, fan_avg, bgg_id=bgg_id, show_id=args.id))
+        print(_format_row(i, name, lift, bgg_rank, avg, fan_avg,
+                          bgg_id=bgg_id, show_id=args.id, show_lift=args.lift))
 
     conn.close()
 

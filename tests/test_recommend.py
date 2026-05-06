@@ -129,3 +129,29 @@ def test_format_row_show_id_false_is_identical_to_default():
     row_off     = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
                               name_width=10, bgg_id=266192, show_id=False)
     assert row_default == row_off
+
+
+def test_format_row_with_lift_shows_lift_value():
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10, show_lift=True)
+    assert "3.45" in row
+
+
+def test_format_row_without_lift_omits_lift_value():
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10, show_lift=False)
+    assert "3.45" not in row
+
+
+def test_format_row_without_lift_still_shows_rank_avg_fan_avg():
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10, show_lift=False)
+    assert "#21" in row
+    assert "8.07" in row
+    assert "8.50" in row
+
+
+def test_format_row_without_lift_long_name_wraps_with_stats_on_last_line():
+    row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20",
+                      name_width=10, show_lift=False)
+    lines = row.split("\n")
+    assert len(lines) > 1
+    assert "1.50" not in lines[-1]
+    assert "N/A" in lines[-1]
