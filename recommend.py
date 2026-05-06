@@ -189,7 +189,7 @@ def main() -> None:
         default=DEFAULT_COLUMNS,
         metavar="COLUMNS",
         help=(
-            "Comma-separated columns to add (+) or remove (-) from the default set. "
+            "Comma-separated columns to add (bare name) or remove (-) from the default set. "
             "E.g. --show=id,lift  --show=-rank  --show=id,-fanavg. "
             "All columns: order, id, name, lift, rank, avg, fanavg. "
             "Default shows: order, name, rank, avg, fanavg."
