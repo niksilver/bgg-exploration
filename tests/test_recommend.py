@@ -106,3 +106,26 @@ def test_resolve_game_shows_full_menu_when_year_has_no_matches(tmp_path, monkeyp
     result = resolve_game("Catan (2000)", conn)  # no match for 2000
 
     assert result == 1  # falls back to full candidate list
+
+
+def test_format_row_with_id_shows_id_between_rank_and_name():
+    row = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                      name_width=10, bgg_id=266192, show_id=True)
+    assert "266192" in row
+    assert row.index("266192") < row.index("Wingspan")
+
+
+def test_format_row_with_id_long_name_continuation_uses_wider_indent():
+    row = _format_row(3, "A Very Long Game Name", 1.50, "N/A", "7.50", "8.20",
+                      name_width=10, bgg_id=12345, show_id=True)
+    lines = row.split("\n")
+    assert len(lines) > 1
+    for line in lines[1:]:
+        assert line.startswith("              ")  # 14 spaces
+
+
+def test_format_row_show_id_false_is_identical_to_default():
+    row_default = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50", name_width=10)
+    row_off     = _format_row(1, "Wingspan", 3.45, "#21", "8.07", "8.50",
+                              name_width=10, bgg_id=266192, show_id=False)
+    assert row_default == row_off

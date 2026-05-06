@@ -37,16 +37,30 @@ def _format_row(
     avg:        str,
     fan_avg:    str,
     name_width: int = NAME_W,
+    bgg_id:     int | None = None,
+    show_id:    bool = False,
 ) -> str:
     """Format one recommendation row, wrapping long names across multiple lines."""
     stats = f"{lift:>5.2f}  {bgg_rank:>6}  {avg:>5}  {fan_avg:>4}"
     lines = textwrap.wrap(name, name_width) or [""]
+
+    if not show_id:
+        # Original logic when show_id is False
+        if len(lines) == 1:
+            return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
+        parts = [f"{i:<4}  {lines[0]}"]
+        for line in lines[1:-1]:
+            parts.append(f"      {line}")
+        parts.append(f"      {lines[-1]:<{name_width}}  {stats}")
+        return "\n".join(parts)
+
+    # Logic when show_id is True
     if len(lines) == 1:
-        return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
-    parts = [f"{i:<4}  {lines[0]}"]
+        return f"{i:<4}  {bgg_id:>6}  {lines[0]:<{name_width}}  {stats}"
+    parts = [f"{i:<4}  {bgg_id:>6}  {lines[0]}"]
     for line in lines[1:-1]:
-        parts.append(f"      {line}")
-    parts.append(f"      {lines[-1]:<{name_width}}  {stats}")
+        parts.append(f"              {line}")
+    parts.append(f"              {lines[-1]:<{name_width}}  {stats}")
     return "\n".join(parts)
 
 
