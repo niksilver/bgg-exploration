@@ -184,12 +184,16 @@ def main() -> None:
         help="Exclude games whose name contains STRING (case-insensitive, repeatable)",
     )
     parser.add_argument(
-        "--id", action="store_true",
-        help="Include BGG ID in output",
-    )
-    parser.add_argument(
-        "--lift", action="store_true",
-        help="Include Lift column in output",
+        "--show",
+        type=lambda s: _parse_show(s, DEFAULT_COLUMNS),
+        default=DEFAULT_COLUMNS,
+        metavar="COLUMNS",
+        help=(
+            "Comma-separated columns to add (+) or remove (-) from the default set. "
+            "E.g. --show=id,lift  --show=-rank  --show=id,-fanavg. "
+            "All columns: order, id, name, lift, rank, avg, fanavg. "
+            "Default shows: order, name, rank, avg, fanavg."
+        ),
     )
     args = parser.parse_args()
 
@@ -234,14 +238,13 @@ def main() -> None:
         conn.close()
         sys.exit(0)
 
-    stats_w   = (7 if args.lift else 0) + 6 + 2 + 5 + 2 + 4
-    id_w      = 8 if args.id else 0
-    total_w   = 4 + 2 + id_w + NAME_W + 2 + stats_w
-    fan_pad   = total_w - 4
-    lift_hdr  = f"  {'Lift':>5}" if args.lift else ""
-    id_hdr    = f"  {'ID':>6}"   if args.id   else ""
-    print(f"{'':>{fan_pad}}{'Fan':>4}")
-    print(f"{'#':<4}{id_hdr}  {'Game':<{NAME_W}}{lift_hdr}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
+    visible   = [c for c in COL_ORDER if c in args.show]
+    hdr_parts = [f"{COL_HDRS[c]:{COL_ALIGN[c]}{COL_WIDTHS[c]}}" for c in visible]
+    header    = "  ".join(hdr_parts)
+    total_w   = len(header)
+    if "fanavg" in args.show:
+        print(f"{'':>{total_w - 4}}{'Fan':>4}")
+    print(header)
     print("─" * total_w)
     for i, (bgg_id, lift, fan_avg_val) in enumerate(recommendations, 1):
         row = conn.execute(
@@ -253,7 +256,7 @@ def main() -> None:
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
         fan_avg  = f"{fan_avg_val:.2f}" if fan_avg_val is not None else "N/A"
         print(_format_row(i, name, lift, bgg_rank, avg, fan_avg,
-                          bgg_id=bgg_id))
+                          bgg_id=bgg_id, shown=args.show))
 
     conn.close()
 
