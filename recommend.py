@@ -45,7 +45,7 @@ def _format_row(
     lines = textwrap.wrap(name, name_width) or [""]
 
     if not show_id:
-        # Original logic when show_id is False
+        # No ID column
         if len(lines) == 1:
             return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
         parts = [f"{i:<4}  {lines[0]}"]
@@ -54,24 +54,15 @@ def _format_row(
         parts.append(f"      {lines[-1]:<{name_width}}  {stats}")
         return "\n".join(parts)
 
-    # Logic when show_id is True
-    if bgg_id is not None:
-        id_prefix = f"{i:<4}  {bgg_id:>6}  "
-        if len(lines) == 1:
-            return id_prefix + f"{lines[0]:<{name_width}}  {stats}"
-        parts = [id_prefix + lines[0]]
-        for line in lines[1:-1]:
-            parts.append(" " * len(id_prefix) + line)
-        parts.append(" " * len(id_prefix) + f"{lines[-1]:<{name_width}}  {stats}")
-        return "\n".join(parts)
-
-    # bgg_id unavailable, fall back to no-ID display
+    # With ID column
+    assert bgg_id is not None, "bgg_id must be provided when show_id=True"
+    id_prefix = f"{i:<4}  {bgg_id:>6}  "
     if len(lines) == 1:
-        return f"{i:<4}  {lines[0]:<{name_width}}  {stats}"
-    parts = [f"{i:<4}  {lines[0]}"]
+        return id_prefix + f"{lines[0]:<{name_width}}  {stats}"
+    parts = [id_prefix + lines[0]]
     for line in lines[1:-1]:
-        parts.append(f"      {line}")
-    parts.append(f"      {lines[-1]:<{name_width}}  {stats}")
+        parts.append(" " * len(id_prefix) + line)
+    parts.append(" " * len(id_prefix) + f"{lines[-1]:<{name_width}}  {stats}")
     return "\n".join(parts)
 
 
