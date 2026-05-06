@@ -1,7 +1,11 @@
+import argparse
 import pytest
 
 from bgg.database import open_db
-from recommend import _format_row, _parse_game_input, resolve_game, GameSearchResult
+from recommend import (
+    _format_row, _parse_game_input, _parse_show,
+    resolve_game, GameSearchResult, DEFAULT_COLUMNS,
+)
 
 
 def test_format_row_short_name_single_line():
@@ -155,3 +159,37 @@ def test_format_row_without_lift_long_name_wraps_with_stats_on_last_line():
     assert len(lines) > 1
     assert "1.50" not in lines[-1]
     assert "N/A" in lines[-1]
+
+
+def test_parse_show_adds_column_not_in_default():
+    result = _parse_show("id", DEFAULT_COLUMNS)
+    assert "id" in result
+    assert "name" in result          # default column still present
+
+
+def test_parse_show_removes_column_from_default():
+    result = _parse_show("-rank", DEFAULT_COLUMNS)
+    assert "rank" not in result
+    assert "name" in result          # other default columns untouched
+
+
+def test_parse_show_mixed_add_and_remove():
+    result = _parse_show("id,-rank", DEFAULT_COLUMNS)
+    assert "id" in result
+    assert "rank" not in result
+    assert "name" in result
+
+
+def test_parse_show_unknown_column_raises_error():
+    with pytest.raises(argparse.ArgumentTypeError):
+        _parse_show("bogus", DEFAULT_COLUMNS)
+
+
+def test_parse_show_reinforcing_present_column_is_noop():
+    result = _parse_show("name", DEFAULT_COLUMNS)
+    assert result == DEFAULT_COLUMNS
+
+
+def test_parse_show_removing_absent_column_is_noop():
+    result = _parse_show("-lift", DEFAULT_COLUMNS)
+    assert result == DEFAULT_COLUMNS

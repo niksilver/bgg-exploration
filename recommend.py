@@ -21,12 +21,38 @@ DB_PATH    = Path("data/bgg.db")
 DEFAULT_N  = 10
 NAME_W     = 45
 
+COL_ORDER       = ("order", "id", "name", "lift", "rank", "avg", "fanavg")
+ALL_COLUMNS     = frozenset(COL_ORDER)
+DEFAULT_COLUMNS = frozenset({"order", "name", "rank", "avg", "fanavg"})
+COL_WIDTHS      = {"order": 4, "id": 6, "name": NAME_W, "lift": 5,
+                   "rank": 6, "avg": 5, "fanavg": 4}
+COL_HDRS        = {"order": "#",    "id": "ID",   "name": "Game", "lift": "Lift",
+                   "rank": "Rank", "avg": "Avg", "fanavg": "avg"}
+COL_ALIGN       = {"order": "<", "id": ">", "name": "<", "lift": ">",
+                   "rank": ">", "avg": ">", "fanavg": ">"}
+
 
 @dataclass(frozen=True)
 class GameSearchResult:
     bgg_id: int
     name:   str
     year:   int | None
+
+
+def _parse_show(value: str, default: frozenset[str]) -> frozenset[str]:
+    shown = set(default)
+    for token in value.split(","):
+        token = token.strip()
+        col   = token[1:] if token.startswith("-") else token
+        if col not in ALL_COLUMNS:
+            raise argparse.ArgumentTypeError(
+                f"unknown column '{col}' (valid: {', '.join(COL_ORDER)})"
+            )
+        if token.startswith("-"):
+            shown.discard(col)
+        else:
+            shown.add(col)
+    return frozenset(shown)
 
 
 def _format_row(
