@@ -158,6 +158,10 @@ def main() -> None:
         "--not", dest="exclusions", action="append", default=[], metavar="STRING",
         help="Exclude games whose name contains STRING (case-insensitive, repeatable)",
     )
+    parser.add_argument(
+        "--id", action="store_true",
+        help="Include BGG ID in output",
+    )
     args = parser.parse_args()
 
     if not DB_PATH.exists():
@@ -201,9 +205,14 @@ def main() -> None:
         conn.close()
         sys.exit(0)
 
-    print(f"{'':75}{'Fan':>4}")
-    print(f"{'#':<4}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
-    print("─" * 79)
+    if not args.id:
+        print(f"{'':75}{'Fan':>4}")
+        print(f"{'#':<4}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
+        print("─" * 79)
+    else:
+        print(f"{'':83}{'Fan':>4}")
+        print(f"{'#':<4}  {'ID':>6}  {'Game':<{NAME_W}}  {'Lift':>5}  {'Rank':>6}  {'Avg':>5}  {'avg':>4}")
+        print("─" * 87)
     for i, (bgg_id, lift, fan_avg_val) in enumerate(recommendations, 1):
         row = conn.execute(
             "SELECT name, bgg_rank, rating_avg FROM games WHERE bgg_id = ?",
@@ -213,7 +222,7 @@ def main() -> None:
         bgg_rank = f"#{row[1]}" if row and row[1] else "N/A"
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
         fan_avg  = f"{fan_avg_val:.2f}" if fan_avg_val is not None else "N/A"
-        print(_format_row(i, name, lift, bgg_rank, avg, fan_avg))
+        print(_format_row(i, name, lift, bgg_rank, avg, fan_avg, bgg_id=bgg_id, show_id=args.id))
 
     conn.close()
 
