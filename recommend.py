@@ -253,7 +253,7 @@ def main() -> None:
         avg      = f"{row[2]:.2f}" if row and row[2] else "N/A"
         fan_avg  = f"{fan_avg_val:.2f}" if fan_avg_val is not None else "N/A"
         print(_format_row(i, name, lift, bgg_rank, avg, fan_avg,
-                          bgg_id=bgg_id, show_id=args.id, show_lift=args.lift))
+                          bgg_id=bgg_id))
 
     conn.close()
 
